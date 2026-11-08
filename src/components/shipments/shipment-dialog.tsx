@@ -42,7 +42,9 @@ export function ShipmentDialog({ mode, board, onClose }: { mode: DialogMode; boa
     shippingCostBdt: mode.kind === "edit" ? (src!.shippingCostBdt ?? "") : "",
     estimatedDeliveryOn: mode.kind === "edit" ? (src!.estimatedDeliveryOn ?? "") : "",
     shippingPaid: mode.kind === "edit" ? src!.shippingPaid : false,
+    shippingPaidOn: mode.kind === "edit" ? (src!.shippingPaidOn ?? "") : "",
     arrived: mode.kind === "edit" ? src!.arrived : false,
+    arrivedOn: mode.kind === "edit" ? (src!.arrivedOn ?? "") : "",
     note: mode.kind === "edit" ? (src!.note ?? "") : "",
   });
   const [newVendor, setNewVendor] = useState<string | null>(null);
@@ -199,13 +201,37 @@ export function ShipmentDialog({ mode, board, onClose }: { mode: DialogMode; boa
             <Field id="sh-cost" label="Shipping cost (BDT)" error={err("shippingCostBdt")}>
               <Input {...fieldA11y("sh-cost", err("shippingCostBdt"))} value={v.shippingCostBdt} onChange={num("shippingCostBdt")} inputMode="decimal" className="num" placeholder="0" />
             </Field>
-            <div className="grid content-end gap-2 pb-1">
+            <div className="hidden sm:block" />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2 rounded-control bg-slate-50 p-3 ring-1 ring-slate-200 ring-inset">
               <label className="flex cursor-pointer items-center gap-2.5 text-body text-slate-800">
-                <Checkbox checked={v.shippingPaid} onCheckedChange={(c) => set("shippingPaid", c === true)} /> Shipping charge paid
+                <Checkbox
+                  checked={v.shippingPaid}
+                  onCheckedChange={(c) => setV((p) => ({ ...p, shippingPaid: c === true, shippingPaidOn: c === true ? p.shippingPaidOn || todayDhaka() : "" }))}
+                />{" "}
+                Shipping charge paid
               </label>
+              {v.shippingPaid ? (
+                <Field id="sh-paid-on" label="Paid on" error={err("shippingPaidOn")}>
+                  <Input {...fieldA11y("sh-paid-on", err("shippingPaidOn"))} type="date" value={v.shippingPaidOn} onChange={(e) => set("shippingPaidOn", e.target.value)} className="num bg-white" />
+                </Field>
+              ) : null}
+            </div>
+            <div className="grid gap-2 rounded-control bg-slate-50 p-3 ring-1 ring-slate-200 ring-inset">
               <label className="flex cursor-pointer items-center gap-2.5 text-body text-slate-800">
-                <Checkbox checked={v.arrived} onCheckedChange={(c) => set("arrived", c === true)} /> Arrived at our warehouse
+                <Checkbox
+                  checked={v.arrived}
+                  onCheckedChange={(c) => setV((p) => ({ ...p, arrived: c === true, arrivedOn: c === true ? p.arrivedOn || todayDhaka() : "" }))}
+                />{" "}
+                Arrived at our warehouse
               </label>
+              {v.arrived ? (
+                <Field id="sh-arrived-on" label="Arrived on" error={err("arrivedOn")}>
+                  <Input {...fieldA11y("sh-arrived-on", err("arrivedOn"))} type="date" value={v.arrivedOn} onChange={(e) => set("arrivedOn", e.target.value)} className="num bg-white" />
+                </Field>
+              ) : null}
             </div>
           </div>
 

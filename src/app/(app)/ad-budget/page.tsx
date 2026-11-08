@@ -7,7 +7,7 @@ import { getAdBudget } from "@/lib/server/queries/ad-budget";
 
 export const metadata: Metadata = { title: "Ad budget" };
 
-const TABS = ["overview", "payments", "spend", "accounts"] as const;
+const TABS = ["overview", "spend", "accounts"] as const;
 
 export default async function AdBudgetPage({ searchParams }: PageProps<"/ad-budget">) {
   const user = await requireCapability("adbudget.view");
@@ -18,7 +18,7 @@ export default async function AdBudgetPage({ searchParams }: PageProps<"/ad-budg
   const data = await getAdBudget(month);
   return (
     <>
-      <PageHeader title="Ad budget" description="Payments to the ad fund provider, what each ad account received, who owes whom, and ad spend by month." />
+      <PageHeader title="Ad budget" description="Each ad fund the provider loads, their bill and whether it's paid; what we owe; and ad spend month by month." />
       <AdBudgetView data={data} tab={tab} canManage={can(user, "adbudget.manage")} />
     </>
   );

@@ -850,8 +850,11 @@ model Shipment {
   shippingCostBdt     Decimal?  @db.Decimal(12, 2)
   estimatedDeliveryOn DateTime? @db.Date
   shippingPaid        Boolean   @default(false)
+  shippingPaidOn      DateTime? @db.Date
   arrived             Boolean   @default(false)
   arrivedAt           DateTime?
+  /// The day it reached our warehouse (editable; set to today when ticked).
+  arrivedOn           DateTime? @db.Date
   note                String?
   createdById         String
   createdAt           DateTime  @default(now())
@@ -895,9 +898,19 @@ model AdPayment {
   id          String     @id @default(cuid())
   number      Int        @unique @default(autoincrement())
   providerId  String
+  /// Fund receive date (column name kept from the first version).
   paidOn      DateTime   @db.Date
+  /// The provider's bill in BDT: BDT credited + fee + USD credited × usdRate (worked out on save).
   amountBdt   Decimal    @db.Decimal(14, 2)
+  /// Provider's fee on the BDT accounts (a BDT amount added to the bill).
+  feeBdt      Decimal    @default(0) @db.Decimal(14, 2)
+  /// BDT per 1 USD for this fund's USD credits.
+  usdRate     Decimal?   @db.Decimal(12, 4)
+  /// Whether we have paid this bill, and when.
+  paid        Boolean    @default(false)
+  paidAt      DateTime?  @db.Date
   reference   String?
+  note        String?
   createdById String
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesFilter, reorderDraft, shipmentState, shipmentTotals } from "./shipments";
+import { flagDay, matchesFilter, reorderDraft, shipmentState, shipmentTotals } from "./shipments";
 
 const base = { arrived: false, estimatedDeliveryOn: null as string | null, shippingPaid: false, shippingCostBdt: null as string | null };
 
@@ -25,7 +25,25 @@ describe("filters and totals", () => {
     expect(list.filter((s) => matchesFilter(s, "arrived"))).toHaveLength(2);
   });
   it("adds up what is still unpaid and what is late", () => {
-    expect(shipmentTotals(list, "2026-11-08")).toEqual({ incoming: 2, late: 1, arrived: 2, unpaid: 3, unpaidCostBdt: "15000.50" });
+    expect(shipmentTotals(list, "2026-11-08")).toEqual({
+      total: 4,
+      incoming: 2,
+      late: 1,
+      arrived: 2,
+      unpaid: 3,
+      unpaidCostBdt: "15000.50",
+      paid: 1,
+      paidCostBdt: "5000.00",
+    });
+  });
+});
+
+describe("paid / arrived days", () => {
+  it("uses the typed day, then the earlier one, then today; clears when unticked", () => {
+    expect(flagDay(true, "2026-11-01", "2026-10-30", "2026-11-08")).toBe("2026-11-01");
+    expect(flagDay(true, null, "2026-10-30", "2026-11-08")).toBe("2026-10-30");
+    expect(flagDay(true, null, null, "2026-11-08")).toBe("2026-11-08");
+    expect(flagDay(false, "2026-11-01", "2026-10-30", "2026-11-08")).toBeNull();
   });
 });
 

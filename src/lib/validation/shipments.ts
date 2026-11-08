@@ -26,7 +26,9 @@ export const shipmentSchema = z.object({
   shippingCostBdt: optionalDecimal("Shipping cost", 2, 100_000_000),
   estimatedDeliveryOn: optionalDay,
   shippingPaid: z.boolean().default(false),
+  shippingPaidOn: optionalDay,
   arrived: z.boolean().default(false),
+  arrivedOn: optionalDay,
   note: z.string().trim().max(1000).optional().nullable().transform((v) => v || null),
 });
 

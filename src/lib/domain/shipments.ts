@@ -30,10 +30,12 @@ export function matchesFilter(s: ShipmentLike, f: ShipmentFilter): boolean {
   return true;
 }
 
-/** Header numbers: shipments on the way, how many and how much shipping is still unpaid, arrived. */
+/** Header numbers: on the way (and late), shipping unpaid and paid (count + BDT), arrived, all. */
 export function shipmentTotals(list: ShipmentLike[], todayDhaka: string) {
   let unpaidCost = new Decimal(0);
+  let paidCost = new Decimal(0);
   let unpaid = 0;
+  let paid = 0;
   let incoming = 0;
   let late = 0;
   let arrived = 0;
@@ -43,12 +45,24 @@ export function shipmentTotals(list: ShipmentLike[], todayDhaka: string) {
       incoming++;
       if (shipmentState(s, todayDhaka) === "late") late++;
     }
-    if (!s.shippingPaid) {
+    if (s.shippingPaid) {
+      paid++;
+      if (s.shippingCostBdt) paidCost = paidCost.plus(s.shippingCostBdt);
+    } else {
       unpaid++;
       if (s.shippingCostBdt) unpaidCost = unpaidCost.plus(s.shippingCostBdt);
     }
   }
-  return { incoming, late, arrived, unpaid, unpaidCostBdt: unpaidCost.toFixed(2) };
+  return { total: list.length, incoming, late, arrived, unpaid, unpaidCostBdt: unpaidCost.toFixed(2), paid, paidCostBdt: paidCost.toFixed(2) };
+}
+
+/**
+ * The day a flag was ticked: keep the typed / earlier day while it stays ticked, today when it is ticked now,
+ * nothing once it is unticked.
+ */
+export function flagDay(on: boolean, typed: string | null, earlier: string | null, todayDhaka: string): string | null {
+  if (!on) return null;
+  return typed ?? earlier ?? todayDhaka;
 }
 
 /** A restock starts from the previous shipment: same product, vendor, quantity and weight; new dates, unpaid, not arrived. */

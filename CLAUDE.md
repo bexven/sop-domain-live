@@ -233,19 +233,28 @@ src/generated/     Prisma client (generated, git-ignored)
 - **Shipment Management** (`/shipments`, Products ▾; `shipments.view` / `shipments.manage`, Supply Chain + Media Buyers by
   default): `ShippingVendor` (Al Baraka default, add more inline), `Shipment` (product, vendor, ordered by (text), order date,
   total weight, quantity, shipping cost typed in BDT, ETA, shipping paid?, arrived?, note). States via `shipmentState()`
-  (ordered / on the way / late / arrived — arrived cards are green); filters On the way · Payment pending · Arrived · All.
+  (ordered / on the way / late / arrived — arrived cards are green); filters All · On the way · Payment pending · Arrived.
   **Request reorder** creates a new shipment for the same product (`reorderOfId`, `reorderDraft()`). "Add a product for
   listing" creates a running product. **Every new product order (Orders tab) creates a shipment** (`productOrderId`,
   default vendor, weight × qty, shipping × qty) and notifies Supply Chain; order rows link to it.
 - **Ad budget** (`/ad-budget`, Admin ▾; `adbudget.view` / `adbudget.manage`, Admins only by default): `AdProvider`,
-  `AdAccount` (currency code; `CURRENCIES` in `domain/ad-budget.ts`), `AdPayment` (BDT) split into `AdCredit`s per account
-  with `rateToBdt` (the payment's dollar rate), dated `AdSpend` entries. `providerBalance()` → paid vs. credited BDT value:
-  provider owes us / we owe / settled (±1 BDT). Tabs Overview · Payments · Ad spend · Accounts; month filter.
+  `AdAccount` (currency code; `CURRENCIES` in `domain/ad-budget.ts`; editable), and **ad funds** (see Round 10).
 - **Roles & permissions**: every capability has a feature `group` (`CAPABILITY_GROUPS`); a new capability shows up on the
   Roles page automatically, unticked. `PermissionRole` = named permission set; `User.permissionRoleId` + `extraPermissions`;
   `User.permissions` always = `effectivePermissions(role, extras)` (recomputed when a role or person changes), so `can()`
   is unchanged. New people / job-role changes start on the role named after the job role. Roles tab (grouped grid) and
   People tab (job role, permission role, admin access, extras, restricted brands).
+
+## Round 10 (ad funds, shipment dates) — supersedes Round 9 where they differ
+- **Ad fund** = one `AdPayment` row (kept the table): provider, fund receive date (`paidOn`), credited accounts (`AdCredit`s),
+  the **provider bill** (`amountBdt`, computed by `fundBill()`): BDT credits + a typed fee (`feeBdt`) + USD credits × the fund's
+  dollar rate (`usdRate`, no fee). Paid? YES/NO (`paid`, `paidAt` = paid date), reference, note. "Record Ad Fund" on Overview.
+- Overview tiles in order: Ad fund cost this month · Provider balance (unpaid bills = what we owe) · Received BDT accounts ·
+  Received USD accounts. **Ad spend tab is automatic**: the fund bills month by month (no manual entries; `AdSpend` table and
+  its actions are kept unused). Month switcher uses ‹ › buttons (the native month input's icon was invisible).
+- **Shipments**: tiles On the way · Shipping unpaid · Shipping paid (BDT) · Active Shipments (= all shipments); tiles that
+  match a filter are clickable; the page opens on **All**. `Shipment.shippingPaidOn` / `arrivedOn` (Dhaka days; `flagDay()`):
+  set to today by the one-tap buttons, editable in the dialog. Desktop = table, below `lg` = cards.
 
 ## Alerts: phone push + Telegram + 10:00 summary
 - **Web Push** (free, `web-push`): `public/sw.js` shows notifications; `src/app/manifest.ts` + `/public/icons`

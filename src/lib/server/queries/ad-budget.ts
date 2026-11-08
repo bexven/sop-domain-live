@@ -1,67 +1,50 @@
 import "server-only";
 import Decimal from "decimal.js";
-import { creditValueBdt, monthOf, paymentDifference, providerBalance, sumBy } from "@/lib/domain/ad-budget";
+import { creditBdt, monthOf, providerBalance, sumBy } from "@/lib/domain/ad-budget";
 import { db } from "../db";
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
 
-/** Everything the Ad Budget page needs; summaries are worked out with the pure rules in domain/ad-budget. */
+/** Everything the Ad budget page needs; the sums use the pure rules in domain/ad-budget. */
 export async function getAdBudget(month: string) {
-  const [providers, accounts, paymentRows, spendRows] = await Promise.all([
+  const [providers, accounts, rows] = await Promise.all([
     db.adProvider.findMany({ orderBy: { name: "asc" } }),
     db.adAccount.findMany({ orderBy: [{ currency: "asc" }, { name: "asc" }], include: { provider: { select: { name: true } } } }),
     db.adPayment.findMany({ orderBy: [{ paidOn: "desc" }, { number: "desc" }], include: { credits: { include: { account: { select: { name: true, currency: true } } } } } }),
-    db.adSpend.findMany({ orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }], include: { account: { select: { name: true, currency: true } } } }),
   ]);
 
-  const payments = paymentRows.map((p) => {
-    const credits = p.credits.map((c) => ({
+  const funds = rows.map((f) => {
+    const usdRate = f.usdRate?.toString() ?? null;
+    const credits = f.credits.map((c) => ({
       id: c.id,
       accountId: c.accountId,
       accountName: c.account.name,
       currency: c.account.currency,
       amount: c.amount.toString(),
-      rateToBdt: c.rateToBdt.toString(),
-      valueBdt: creditValueBdt({ amount: c.amount.toString(), rateToBdt: c.rateToBdt.toString() }).toFixed(2),
+      // Funds recorded before the bill existed have no fund-level rate: use the credit's own rate.
+      billBdt: creditBdt({ amount: c.amount.toString(), currency: c.account.currency }, usdRate ?? c.rateToBdt.toString()).toFixed(2),
     }));
     return {
-      id: p.id,
-      number: p.number,
-      providerId: p.providerId,
-      paidOn: day(p.paidOn),
-      amountBdt: p.amountBdt.toString(),
-      reference: p.reference,
+      id: f.id,
+      number: f.number,
+      providerId: f.providerId,
+      receivedOn: day(f.paidOn),
+      billBdt: f.amountBdt.toString(),
+      feeBdt: f.feeBdt.toString(),
+      usdRate,
+      paid: f.paid,
+      paidOn: f.paidAt ? day(f.paidAt) : null,
+      reference: f.reference,
+      note: f.note,
       credits,
-      difference: paymentDifference({ amountBdt: p.amountBdt.toString(), credits }),
     };
   });
 
-  const spends = spendRows.map((s) => ({
-    id: s.id,
-    accountId: s.accountId,
-    accountName: s.account.name,
-    currency: s.account.currency,
-    spentOn: day(s.spentOn),
-    amount: s.amount.toString(),
-    note: s.note,
-  }));
-
-  const creditsAll = payments.flatMap((p) => p.credits);
-  const creditedByAccount = sumBy(creditsAll, (c) => c.accountId, (c) => c.amount);
-  const creditedByCurrency = sumBy(creditsAll, (c) => c.currency, (c) => c.amount);
-  const spentByAccount = sumBy(spends, (s) => s.accountId, (s) => s.amount);
-  const monthSpends = spends.filter((s) => monthOf(s.spentOn) === month);
-  const monthByAccount = sumBy(monthSpends, (s) => s.accountId, (s) => s.amount);
-  const monthByCurrency = sumBy(monthSpends, (s) => s.currency, (s) => s.amount);
-  const months = [...new Set(spends.map((s) => monthOf(s.spentOn)))].sort().reverse();
-  const monthly = months.map((m) => ({ month: m, byCurrency: sumBy(spends.filter((s) => monthOf(s.spentOn) === m), (s) => s.currency, (s) => s.amount) }));
-
-  const providerBalances = providers.map((pr) => ({
-    id: pr.id,
-    name: pr.name,
-    ...providerBalance(payments.filter((p) => p.providerId === pr.id)),
-  }));
-  const overall = providerBalance(payments);
+  const inMonth = funds.filter((f) => monthOf(f.receivedOn) === month);
+  const monthCredits = inMonth.flatMap((f) => f.credits);
+  const allCredits = funds.flatMap((f) => f.credits);
+  const balance = providerBalance(funds);
+  const months = [...new Set(funds.map((f) => monthOf(f.receivedOn)))].sort().reverse();
 
   return {
     month,
@@ -73,23 +56,34 @@ export async function getAdBudget(month: string) {
       providerId: a.providerId,
       providerName: a.provider?.name ?? null,
       active: a.active,
-      credited: creditedByAccount[a.id] ?? "0.00",
-      spent: spentByAccount[a.id] ?? "0.00",
-      remaining: new Decimal(creditedByAccount[a.id] ?? 0).minus(spentByAccount[a.id] ?? 0).toFixed(2),
-      monthSpent: monthByAccount[a.id] ?? "0.00",
+      credited: sumBy(allCredits.filter((c) => c.accountId === a.id), () => "x", (c) => c.amount).x ?? "0.00",
+      monthCredited: sumBy(monthCredits.filter((c) => c.accountId === a.id), () => "x", (c) => c.amount).x ?? "0.00",
+      monthBillBdt: sumBy(monthCredits.filter((c) => c.accountId === a.id), () => "x", (c) => c.billBdt).x ?? "0.00",
     })),
-    payments,
-    spends,
-    monthSpends,
+    funds,
     overview: {
-      paidBdt: overall.paidBdt,
-      creditedByCurrency,
-      difference: overall.difference,
-      status: overall.status,
-      monthByCurrency,
+      monthCostBdt: sumBy(inMonth, () => "x", (f) => f.billBdt).x ?? "0.00",
+      monthReceivedByCurrency: sumBy(monthCredits, (c) => c.currency, (c) => c.amount),
+      monthFeeBdt: sumBy(inMonth, () => "x", (f) => f.feeBdt).x ?? "0.00",
+      ...balance,
     },
-    providerBalances,
-    monthly,
+    providerBalances: providers.map((p) => ({ id: p.id, name: p.name, ...providerBalance(funds.filter((f) => f.providerId === p.id)) })),
+    /** Ad spend = what the ad funds cost, month by month (automatic). */
+    monthly: months.map((m) => {
+      const fs = funds.filter((f) => monthOf(f.receivedOn) === m);
+      const cs = fs.flatMap((f) => f.credits);
+      return {
+        month: m,
+        totalBdt: sumBy(fs, () => "x", (f) => f.billBdt).x ?? "0.00",
+        paidBdt: sumBy(fs.filter((f) => f.paid), () => "x", (f) => f.billBdt).x ?? "0.00",
+        unpaidBdt: sumBy(fs.filter((f) => !f.paid), () => "x", (f) => f.billBdt).x ?? "0.00",
+        feeBdt: sumBy(fs, () => "x", (f) => f.feeBdt).x ?? "0.00",
+        receivedByCurrency: sumBy(cs, (c) => c.currency, (c) => c.amount),
+        byAccount: Object.entries(sumBy(cs, (c) => c.accountId, (c) => c.billBdt))
+          .map(([accountId, bdt]) => ({ accountId, name: cs.find((c) => c.accountId === accountId)!.accountName, billBdt: bdt }))
+          .sort((a, b) => new Decimal(b.billBdt).cmp(a.billBdt)),
+      };
+    }),
   };
 }
 

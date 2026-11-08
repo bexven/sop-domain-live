@@ -22,16 +22,41 @@ export const accountSchema = z.object({
   active: z.boolean().default(true),
 });
 
-export const paymentSchema = z.object({
-  paymentId: optionalId,
-  providerId: idSchema,
-  paidOn: day,
-  amountBdt: amount("Amount paid"),
-  /** BDT per 1 unit, for each non-BDT currency used in the credits (e.g. { USD: "128.50" }). */
-  rates: z.record(z.string(), z.string().trim().regex(/^\d+(\.\d{1,4})?$/, "Enter the rate, e.g. 128.50")).default({}),
-  reference: z.string().trim().max(500).optional().nullable().transform((v) => v || null),
-  credits: z.array(z.object({ accountId: idSchema, amount: amount("Amount credited") })).min(1, "Add at least one ad account credited").max(20),
-});
+const money0 = (label: string) =>
+  z
+    .string()
+    .trim()
+    .optional()
+    .nullable()
+    .transform((v) => (v ? v.replace(/^\./, "0.") : "0"))
+    .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), `${label} must be a number`)
+    .refine((v) => Number(v) <= 1_000_000_000, `${label} is too large`);
+
+/** "Record Ad Fund": what the provider loaded into our accounts, their bill, and whether we've paid it. */
+export const fundSchema = z
+  .object({
+    fundId: optionalId,
+    providerId: idSchema,
+    receivedOn: day,
+    credits: z.array(z.object({ accountId: idSchema, amount: amount("Amount credited") })).min(1, "Add at least one ad account credited").max(20),
+    feeBdt: money0("Fee"),
+    usdRate: z
+      .string()
+      .trim()
+      .optional()
+      .nullable()
+      .transform((v) => v || null)
+      .refine((v) => v === null || /^\d+(\.\d{1,4})?$/.test(v), "Enter the dollar rate, e.g. 128.50"),
+    paid: z.boolean().default(false),
+    paidOn: z.union([day, z.literal("")]).optional().nullable().transform((v) => v || null),
+    reference: z.string().trim().max(200).optional().nullable().transform((v) => v || null),
+    note: z.string().trim().max(1000).optional().nullable().transform((v) => v || null),
+  })
+  .superRefine((v, ctx) => {
+    if (v.paid && !v.paidOn) ctx.addIssue({ code: "custom", path: ["paidOn"], message: "When was it paid?" });
+  });
+
+export const fundPaidSchema = z.object({ fundId: idSchema, paid: z.boolean() });
 
 export const spendSchema = z.object({
   spendId: optionalId,

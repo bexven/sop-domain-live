@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { shipmentRef } from "@/lib/domain/shipments";
+import { flagDay, shipmentRef } from "@/lib/domain/shipments";
 import { listingSchema, shipmentFlagSchema, shipmentIdSchema, shipmentSchema, vendorSchema } from "@/lib/validation/shipments";
 import { ActionError, defineAction } from "../action";
 import { db } from "../db";
@@ -14,6 +14,8 @@ function revalidate() {
 }
 
 const dayDate = (d: string | null) => (d ? new Date(`${d}T00:00:00Z`) : null);
+const dayString = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
+const todayDhaka = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(new Date());
 
 /** Add, edit or re-order a shipment. A re-order is a new record linked to the same product and to the earlier shipment. */
 export const saveShipmentAction = defineAction({
@@ -36,13 +38,20 @@ export const saveShipmentAction = defineAction({
         shippingPaid: f.shippingPaid,
         note: f.note,
       };
+      const today = todayDhaka();
       if (shipmentId) {
         const existing = await tx.shipment.findUnique({ where: { id: shipmentId } });
         // The product is checked against the person's brand access (defineAction), so it must be the shipment's own.
         if (!existing || existing.productId !== productId) throw new ActionError("That shipment no longer exists.");
         await tx.shipment.update({
           where: { id: shipmentId },
-          data: { ...data, arrived, arrivedAt: arrived ? (existing.arrivedAt ?? new Date()) : null },
+          data: {
+            ...data,
+            shippingPaidOn: dayDate(flagDay(f.shippingPaid, f.shippingPaidOn, dayString(existing.shippingPaidOn), today)),
+            arrived,
+            arrivedAt: arrived ? (existing.arrivedAt ?? new Date()) : null,
+            arrivedOn: dayDate(flagDay(arrived, f.arrivedOn, dayString(existing.arrivedOn), today)),
+          },
         });
         return existing.number;
       }
@@ -51,7 +60,15 @@ export const saveShipmentAction = defineAction({
         if (!prev || prev.productId !== productId) throw new ActionError("The earlier shipment no longer exists.");
       }
       const created = await tx.shipment.create({
-        data: { ...data, reorderOfId, arrived, arrivedAt: arrived ? new Date() : null, createdById: user.id },
+        data: {
+          ...data,
+          shippingPaidOn: dayDate(flagDay(f.shippingPaid, f.shippingPaidOn, null, today)),
+          reorderOfId,
+          arrived,
+          arrivedAt: arrived ? new Date() : null,
+          arrivedOn: dayDate(flagDay(arrived, f.arrivedOn, null, today)),
+          createdById: user.id,
+        },
       });
       await logEvents(tx, [{ type: "ORDER_UPDATED", actorId: user.id, productId, data: { shipment: created.number, reorder: Boolean(reorderOfId) } }]);
       return created.number;
@@ -68,7 +85,9 @@ export const setShipmentFlagAction = defineAction({
   run: async ({ productId, shipmentId, field, value }) => {
     const s = await db.shipment.findUnique({ where: { id: shipmentId } });
     if (!s || s.productId !== productId) throw new ActionError("That shipment no longer exists.");
-    const data = field === "arrived" ? { arrived: value, arrivedAt: value ? new Date() : null } : { shippingPaid: value };
+    const today = dayDate(value ? todayDhaka() : null);
+    const data =
+      field === "arrived" ? { arrived: value, arrivedAt: value ? new Date() : null, arrivedOn: today } : { shippingPaid: value, shippingPaidOn: today };
     const updated = await db.shipment.updateMany({ where: { id: shipmentId, [field]: !value }, data });
     if (updated.count !== 1) throw new ActionError("Someone changed this just now. Refresh to see it.");
     revalidate();
