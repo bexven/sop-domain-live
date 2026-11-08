@@ -8,6 +8,7 @@ import {
   PackageIcon,
   ShieldCheckIcon,
   TruckIcon,
+  ShipIcon,
   PieChartIcon,
   UsersIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
   pipeline: KanbanSquareIcon,
   products: PackageIcon,
   orders: TruckIcon,
+  shipments: ShipIcon,
   overview: PieChartIcon,
   team: UsersIcon,
   roles: ShieldCheckIcon,

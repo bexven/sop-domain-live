@@ -195,6 +195,7 @@ export function OrdersTab({ product, viewer }: { product: ProductDetail; viewer:
                           <span className="font-semibold text-slate-900">{orderTitle(o)}</span>
                           <span className="num ml-2 text-meta text-slate-500">{formatDate(new Date(`${o.orderedOn}T00:00:00Z`))}</span>
                           {o.note ? <span className="block max-w-[14rem] truncate text-meta font-normal text-slate-600">{o.note}</span> : null}
+                          {o.shipment ? <ShipmentChip s={o.shipment} /> : null}
                         </td>
                         <td className="num px-3 py-2.5 text-right">{o.quantity.toLocaleString("en-IN")}</td>
                         <td className="num px-3 py-2.5 text-right">{formatBdt(o.buyingPriceBdt)}</td>
@@ -711,5 +712,20 @@ function TestOrderForm({ product, test, canPlace, onDone }: { product: ProductDe
         </Button>
       </div>
     </div>
+  );
+}
+
+/** The order's shipment in Shipment Management: arrived (green) or on its way. */
+function ShipmentChip({ s }: { s: { number: number; arrived: boolean; eta: string | null } }) {
+  return (
+    <a
+      href="/shipments"
+      className={cn(
+        "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-meta ring-1 ring-inset hover:underline",
+        s.arrived ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : "bg-sky-50 text-sky-800 ring-sky-200",
+      )}
+    >
+      <TruckIcon className="size-3.5" aria-hidden /> S-{s.number} · {s.arrived ? "arrived" : s.eta ? `ETA ${formatDate(new Date(`${s.eta}T00:00:00Z`))}` : "shipping"}
+    </a>
   );
 }

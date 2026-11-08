@@ -56,7 +56,7 @@ export async function getProductDetail(id: string, viewer: BrandViewer & { role?
         adCampaigns: { orderBy: { number: "asc" } },
         batches: { orderBy: { number: "asc" } },
         transitions: { orderBy: { at: "asc" } },
-        orders: { orderBy: { number: "desc" }, include: { createdBy: person } },
+        orders: { orderBy: { number: "desc" }, include: { createdBy: person, shipment: { select: { number: true, arrived: true, estimatedDeliveryOn: true } } } },
         testOrders: { orderBy: { createdAt: "desc" }, include: { createdBy: person } },
         tasks: {
           orderBy: [{ createdAt: "asc" }],
@@ -239,6 +239,7 @@ export async function getProductDetail(id: string, viewer: BrandViewer & { role?
       quantity: o.quantity,
       buyingPriceBdt: o.buyingPriceBdt.toString(),
       name: o.name,
+      shipment: o.shipment ? { number: o.shipment.number, arrived: o.shipment.arrived, eta: o.shipment.estimatedDeliveryOn?.toISOString().slice(0, 10) ?? null } : null,
       shippingCostBdt: o.shippingCostBdt.toString(),
       weightKg: str(o.weightKg),
       shippingMethod: o.shippingMethod,

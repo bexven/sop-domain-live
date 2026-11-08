@@ -304,6 +304,7 @@ model Product {
   testOrders    TestOrder[]
   adCampaigns   AdCampaign[]
   manualTasks   ManualTask[]
+  shipments     Shipment[]
   createdBy     User              @relation("ProductCreator", fields: [createdById], references: [id])
   mediaBuyer    User?             @relation("ProductMediaBuyer", fields: [mediaBuyerId], references: [id])
   brand         Brand?            @relation(fields: [brandId], references: [id])
@@ -724,8 +725,9 @@ model ProductOrder {
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  createdBy User    @relation("OrderCreator", fields: [createdById], references: [id])
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("OrderCreator", fields: [createdById], references: [id])
+  shipment  Shipment?
 
   @@unique([productId, number])
 }
@@ -813,6 +815,52 @@ model ManualTaskComment {
   author User       @relation("ManualTaskCommentAuthor", fields: [authorId], references: [id])
 
   @@index([taskId, createdAt])
+}
+
+/// Shipping / forwarding vendors (Al Baraka is the default). More can be added from the shipment form.
+model ShippingVendor {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  isDefault Boolean    @default(false)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  shipments Shipment[]
+}
+
+/// A purchase on its way to our warehouse (Shipment Management). Linked to a product; optionally to the
+/// product order that created it, and to the shipment it re-orders.
+model Shipment {
+  id                  String    @id @default(cuid())
+  /// Human reference, shown as S-12.
+  number              Int       @unique @default(autoincrement())
+  productId           String
+  vendorId            String?
+  /// The product order (Orders tab) this shipment came from, if any.
+  productOrderId      String?   @unique
+  /// The earlier shipment this one restocks.
+  reorderOfId         String?
+  orderedBy           String
+  orderedOn           DateTime  @db.Date
+  totalWeightKg       Decimal?  @db.Decimal(12, 3)
+  quantity            Int
+  shippingCostBdt     Decimal?  @db.Decimal(12, 2)
+  estimatedDeliveryOn DateTime? @db.Date
+  shippingPaid        Boolean   @default(false)
+  arrived             Boolean   @default(false)
+  arrivedAt           DateTime?
+  note                String?
+  createdById         String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  product      Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendor       ShippingVendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  productOrder ProductOrder?   @relation(fields: [productOrderId], references: [id], onDelete: SetNull)
+  reorderOf    Shipment?       @relation("Reorders", fields: [reorderOfId], references: [id], onDelete: SetNull)
+  reorders     Shipment[]      @relation("Reorders")
+
+  @@index([productId, orderedOn])
+  @@index([arrived, estimatedDeliveryOn])
 }
 
 /// A browser / phone that turned on push notifications for one person.

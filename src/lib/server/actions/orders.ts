@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import Decimal from "decimal.js";
 import { addOrderError, canPlaceTestOrder, moveToOrderingError, SCALE_VERDICT_LABELS } from "@/lib/domain/orders";
 import { can } from "@/lib/domain/permissions";
 import { shippingFromWeight, SHIPPING_METHOD_LABELS } from "@/lib/domain/margin";
@@ -74,11 +75,27 @@ export const saveOrderAction = defineAction({
       }
       const last = await tx.productOrder.aggregate({ where: { productId }, _max: { number: true } });
       const next = (last._max.number ?? 0) + 1;
-      await tx.productOrder.create({
+      const createdOrder = await tx.productOrder.create({
         data: { ...data, productId, number: next, createdById: user.id, courierChargePct: settings?.courierChargePct ?? p.courierChargePct },
       });
       await logEvents(tx, [{ type: "ORDER_CREATED", actorId: user.id, productId, data: { number: next, name: fields.name, quantity: fields.quantity } }]);
-      await notifySupply(tx, user.id, p, `${user.name} added order “${fields.name}” (${fields.quantity.toLocaleString("en-IN")} units) for ${p.name}`);
+      // Every new order goes to Shipment Management (owner's rule), with the default vendor; Supply Chain adds the rest.
+      const vendor = await tx.shippingVendor.findFirst({ where: { isDefault: true, active: true }, select: { id: true } });
+      await tx.shipment.create({
+        data: {
+          productId,
+          productOrderId: createdOrder.id,
+          vendorId: vendor?.id ?? null,
+          orderedBy: user.name,
+          orderedOn: data.orderedOn,
+          quantity: fields.quantity,
+          totalWeightKg: new Decimal(fields.weightKg).times(fields.quantity).toDecimalPlaces(3).toString(),
+          shippingCostBdt: new Decimal(shipping).times(fields.quantity).toDecimalPlaces(2).toString(),
+          note: `From order “${fields.name}”`,
+          createdById: user.id,
+        },
+      });
+      await notifySupply(tx, user.id, p, `${user.name} added order “${fields.name}” (${fields.quantity.toLocaleString("en-IN")} units) for ${p.name} · it's in Shipments`, true);
       return next;
     });
     revalidate();

@@ -45,15 +45,16 @@ describe("permissions", () => {
 describe("navigation", () => {
   const keys = (s: ReturnType<typeof as>, isMaster = false) => navItemsFor(s, { isMaster }).map((i) => i.key);
   it("gives the Master Admin every menu", () => {
-    expect(keys(as("ADMIN"), true)).toEqual(["dashboard", "research", "creative", "tasks", "products", "pipeline", "orders", "overview", "team", "roles"]);
+    expect(keys(as("ADMIN"), true)).toEqual(["dashboard", "research", "creative", "tasks", "products", "pipeline", "orders", "shipments", "overview", "team", "roles"]);
   });
   it("hides Team and Roles from admins who aren't the master", () => {
-    expect(keys(as("ADMIN"))).toEqual(["dashboard", "research", "creative", "tasks", "products", "pipeline", "orders", "overview"]);
+    expect(keys(as("ADMIN"))).toEqual(["dashboard", "research", "creative", "tasks", "products", "pipeline", "orders", "shipments", "overview"]);
   });
   it("shows Research only to people allowed to see it", () => {
-    for (const r of ["RESEARCHER", "MEDIA_BUYER", "REVIEWER"] as const) {
+    for (const r of ["RESEARCHER", "REVIEWER"] as const) {
       expect(keys(as(r))).toEqual(["dashboard", "research", "creative", "tasks", "products", "pipeline", "orders"]);
     }
+    expect(keys(as("MEDIA_BUYER"))).toEqual(["dashboard", "research", "creative", "tasks", "products", "pipeline", "orders", "shipments"]);
     for (const r of ["IMAGE_DESIGNER", "VIDEO_EDITOR"] as const) {
       expect(keys(as(r))).toEqual(["dashboard", "creative", "tasks", "products", "pipeline", "orders"]);
     }

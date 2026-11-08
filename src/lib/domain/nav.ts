@@ -1,6 +1,6 @@
 import { can, canSeeEarlyStages, type Subject } from "./permissions";
 
-export type NavKey = "dashboard" | "tasks" | "research" | "creative" | "pipeline" | "products" | "orders" | "overview" | "team" | "roles";
+export type NavKey = "dashboard" | "tasks" | "research" | "creative" | "pipeline" | "products" | "orders" | "shipments" | "overview" | "team" | "roles";
 
 export type NavItem = {
   key: NavKey;
@@ -38,6 +38,7 @@ const ALL: (NavItem & { visible: (s: Subject, ctx: Ctx) => boolean })[] = [
   { key: "products", label: "Products", href: "/products", hint: "Search all products", section: "products", visible: () => true },
   { key: "pipeline", label: "Pipeline", href: "/pipeline", hint: "Every product by stage", section: "products", visible: () => true },
   { key: "orders", label: "Orders", href: "/orders", hint: "Stock orders and scaling", section: "products", visible: () => true },
+  { key: "shipments", label: "Shipments", href: "/shipments", hint: "Purchases on the way, costs and arrivals", section: "products", visible: (r) => can(r, "shipments.view") },
   { key: "overview", label: "Overview", href: "/overview", hint: "Workload and bottlenecks", section: "admin", visible: (r) => can(r, "overview.view") },
   // Only the Master Admin manages people, names, roles and PINs.
   { key: "team", label: "Team", href: "/team", hint: "People, names and PINs", section: "admin", visible: (_r, ctx) => ctx.isMaster },
