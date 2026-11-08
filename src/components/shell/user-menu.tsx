@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDownIcon, KeyRoundIcon, LogOutIcon, RepeatIcon, UserRoundIcon } from "lucide-react";
+import { ChevronDownIcon, KeyRoundIcon, LogOutIcon, RepeatIcon, SettingsIcon, UserRoundIcon } from "lucide-react";
 import type { Role } from "@/generated/prisma/enums";
 import { RolePill } from "@/components/common/pill";
 import { UserAvatar } from "@/components/common/user-avatar";
@@ -16,7 +16,7 @@ import { logoutAction } from "@/lib/server/actions/auth";
 import { cn } from "@/lib/utils";
 import { HoverDropdown, useHoverMenu } from "./hover-menu";
 
-export function UserMenu({ user }: { user: { name: string; role: Role; avatarColor: string; avatarAssetId?: string | null } }) {
+export function UserMenu({ user, canSettings = false }: { user: { name: string; role: Role; avatarColor: string; avatarAssetId?: string | null }; canSettings?: boolean }) {
   const { open, setOpen, hover } = useHoverMenu();
   return (
     <HoverDropdown open={open} setOpen={setOpen}>
@@ -37,6 +37,13 @@ export function UserMenu({ user }: { user: { name: string; role: Role; avatarCol
             <UserRoundIcon /> My profile & photo
           </Link>
         </DropdownMenuItem>
+        {canSettings ? (
+          <DropdownMenuItem asChild>
+            <Link href="/settings">
+              <SettingsIcon /> Settings
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem asChild>
           <Link href="/change-pin">
             <KeyRoundIcon /> Change PIN

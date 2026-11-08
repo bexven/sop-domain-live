@@ -1,6 +1,6 @@
 import { can, canSeeEarlyStages, type Subject } from "./permissions";
 
-export type NavKey = "dashboard" | "tasks" | "research" | "creative" | "pipeline" | "products" | "orders" | "overview" | "team" | "roles" | "settings";
+export type NavKey = "dashboard" | "tasks" | "research" | "creative" | "pipeline" | "products" | "orders" | "overview" | "team" | "roles";
 
 export type NavItem = {
   key: NavKey;
@@ -42,7 +42,6 @@ const ALL: (NavItem & { visible: (s: Subject, ctx: Ctx) => boolean })[] = [
   // Only the Master Admin manages people, names, roles and PINs.
   { key: "team", label: "Team", href: "/team", hint: "People, names and PINs", section: "admin", visible: (_r, ctx) => ctx.isMaster },
   { key: "roles", label: "Roles & permissions", href: "/team/roles", hint: "Tick what each person can do", section: "admin", visible: (_r, ctx) => ctx.isMaster },
-  { key: "settings", label: "Settings", href: "/settings", hint: "Rates, SLAs and checklists", section: "admin", visible: (r) => can(r, "settings.manage") },
 ];
 
 /** Menu items for a role. Cosmetic: every page re-checks on the server. */

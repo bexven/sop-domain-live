@@ -9,7 +9,6 @@ import {
   ShieldCheckIcon,
   TruckIcon,
   PieChartIcon,
-  SettingsIcon,
   UsersIcon,
 } from "lucide-react";
 import type { NavKey } from "@/lib/domain/nav";
@@ -25,5 +24,4 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
   overview: PieChartIcon,
   team: UsersIcon,
   roles: ShieldCheckIcon,
-  settings: SettingsIcon,
 };

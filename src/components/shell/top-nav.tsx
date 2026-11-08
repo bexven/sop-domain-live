@@ -23,7 +23,7 @@ function isActive(pathname: string, href: string) {
 }
 
 /** Glass menu bar across the top: clear labels with icons; Admin pages grouped in one menu. */
-export function TopNav({ items, user, badges }: { items: NavItem[]; user: ShellUser; badges: Partial<Record<string, number>> }) {
+export function TopNav({ items, user, badges, canSettings = false }: { items: NavItem[]; user: ShellUser; badges: Partial<Record<string, number>>; canSettings?: boolean }) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
@@ -52,7 +52,7 @@ export function TopNav({ items, user, badges }: { items: NavItem[]; user: ShellU
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <SearchButton />
           <NotificationBell />
-          <UserMenu user={user} />
+          <UserMenu user={user} canSettings={canSettings} />
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
