@@ -20,9 +20,20 @@ export const accessSchema = z.object({
   id: idSchema,
   role,
   adminAccess: z.boolean(),
-  permissions: z.array(z.string().max(40)).max(40),
+  /** The permission role (template); extras are ticked just for this person on top of it. */
+  permissionRoleId: z.string().max(64).optional().nullable().transform((v) => v || null),
+  extraPermissions: z.array(z.string().max(40)).max(80).default([]),
   brandAccess: z.array(idSchema).max(50).default([]),
 });
+
+/** A named permission role (Roles tab). */
+export const permissionRoleSchema = z.object({
+  roleId: z.string().max(64).optional().nullable().transform((v) => v || null),
+  name: z.string().trim().min(2, "Name the role").max(40, "Keep the name under 40 characters"),
+  description: z.string().trim().max(200).optional().nullable().transform((v) => v || null),
+  permissions: z.array(z.string().max(40)).max(80).default([]),
+});
+export const permissionRoleIdSchema = z.object({ roleId: idSchema });
 
 export type CreateMemberInput = z.infer<typeof createMemberSchema>;
 export type UpdateMemberInput = z.infer<typeof updateMemberSchema>;

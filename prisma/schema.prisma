@@ -179,7 +179,7 @@ enum NotificationType {
 }
 
 model User {
-  id                String    @id @default(cuid())
+  id                String          @id @default(cuid())
   name              String
   role              Role
   pinHash           String
@@ -187,35 +187,39 @@ model User {
   /// Uploaded profile photo (stored in Asset).
   avatarAssetId     String?
   /// Full admin permissions on top of their job role (e.g. a researcher who is also an admin).
-  adminAccess       Boolean   @default(false)
+  adminAccess       Boolean         @default(false)
   /// The Master Admin: the only one who manages the team (people, names, roles, PINs).
-  isMaster          Boolean   @default(false)
+  isMaster          Boolean         @default(false)
   /// Individual permissions (capability keys), ticked by the Master Admin. Defaults come from the job role.
-  permissions       String[]  @default([])
+  /// Permission role (template) and extras ticked just for this person; permissions = role ∪ extras.
+  permissionRoleId  String?
+  extraPermissions  String[]        @default([])
+  permissionRole    PermissionRole? @relation(fields: [permissionRoleId], references: [id], onDelete: SetNull)
+  permissions       String[]        @default([])
   /// Telegram chat this person connected (via the bot's /start link). Null = not connected.
-  telegramChatId    String?   @unique
+  telegramChatId    String?         @unique
   /// One-time code in the "Connect Telegram" link; expires after 15 minutes.
-  telegramLinkCode  String?   @unique
+  telegramLinkCode  String?         @unique
   telegramLinkUntil DateTime?
   /// Send each notification to their phone/Telegram as it happens.
-  alertsInstant     Boolean   @default(true)
+  alertsInstant     Boolean         @default(true)
   /// The 10:00 (Dhaka) morning summary of what's waiting on them.
-  alertsDigest      Boolean   @default(true)
-  active            Boolean   @default(true)
+  alertsDigest      Boolean         @default(true)
+  active            Boolean         @default(true)
   /// Removed from the team: hidden everywhere; their past work and history stay.
   removedAt         DateTime?
   /// Restricted brands (e.g. Bexven) this person may see. The Master Admin always sees every brand.
-  brandAccess       String[]  @default([])
+  brandAccess       String[]        @default([])
   /// Forces a PIN change on next login (seeded users, admin PIN resets).
-  mustChangePin     Boolean   @default(false)
+  mustChangePin     Boolean         @default(false)
   /// Embedded in the session cookie; bumping it revokes every session.
-  sessionVersion    Int       @default(0)
-  failedPinAttempts Int       @default(0)
+  sessionVersion    Int             @default(0)
+  failedPinAttempts Int             @default(0)
   lockedUntil       DateTime?
   /// Tie-breaker for auto-assignment (least recently assigned wins).
   lastAssignedAt    DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   createdProducts Product[]           @relation("ProductCreator")
   ownedProducts   Product[]           @relation("ProductMediaBuyer")
@@ -930,6 +934,18 @@ model AdSpend {
 
   @@index([accountId, spentOn])
   @@index([spentOn])
+}
+
+/// A named set of permissions (Roles & permissions page). People get one role plus any extra permissions;
+/// User.permissions always holds the result (role ∪ extras), so permission checks stay a simple list lookup.
+model PermissionRole {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
 }
 
 /// A browser / phone that turned on push notifications for one person.

@@ -108,7 +108,7 @@ src/generated/     Prisma client (generated, git-ignored)
 
 ## Owner's redesign (after first test) — supersedes the brief where they differ
 - **Top menu bar**, no sidebar. Items: Dashboard · Research (researcher/admin) · Creative (designers,
-  editor, media buyer, admin) · Pipeline · Products · Admin ▾ (Overview, Team, Settings). Labels + hints.
+  editor, media buyer, admin) · Pipeline · Products · Admin ▾ (Overview, Team, Settings). Labels + hints. (Round 9: Settings moved to the profile menu.)
   (Nov 2026: Products ▾ groups Products · Pipeline · Orders; Products ▾ / Admin ▾ / profile menus open on hover.)
 - **No slide-over panel.** Products open as a full page `/products/[id]` (back link + breadcrumb);
   `?task=<id>` opens and scrolls to a task.
@@ -222,6 +222,30 @@ src/generated/     Prisma client (generated, git-ignored)
   before and one "Overdue" notification per due time (`dueSoonNotifiedAt` / `overdueNotifiedAt` on Task and ManualTask),
   also sent to phones / Telegram. On Vercel the scheduler only runs daily; on the VPS every 10 minutes.
 - A named batch #1 shows its own name (falls back to "First creatives").
+
+## Round 9 (Add Product, Shipments, Ad budget, roles)
+- **"Add Product"** everywhere (button, window, shortcut). New permission **Add running products** (`product.addRunning`,
+  Media Buyers by default; Shakil has it and `product.create`). Already-running products take name, brand, product URL
+  (`websiteUrl`), picture, **old image / video assets** (`Product.oldImageAssets` / `oldVideoAssets`, shown with Resources
+  tagged "Old images" / "Old videos") and resources; **new creatives are optional** (tick box). Shared service
+  `services/running-product.ts`.
+- **Settings** lives in the profile menu (removed from Admin ▾).
+- **Shipment Management** (`/shipments`, Products ▾; `shipments.view` / `shipments.manage`, Supply Chain + Media Buyers by
+  default): `ShippingVendor` (Al Baraka default, add more inline), `Shipment` (product, vendor, ordered by (text), order date,
+  total weight, quantity, shipping cost typed in BDT, ETA, shipping paid?, arrived?, note). States via `shipmentState()`
+  (ordered / on the way / late / arrived — arrived cards are green); filters On the way · Payment pending · Arrived · All.
+  **Request reorder** creates a new shipment for the same product (`reorderOfId`, `reorderDraft()`). "Add a product for
+  listing" creates a running product. **Every new product order (Orders tab) creates a shipment** (`productOrderId`,
+  default vendor, weight × qty, shipping × qty) and notifies Supply Chain; order rows link to it.
+- **Ad budget** (`/ad-budget`, Admin ▾; `adbudget.view` / `adbudget.manage`, Admins only by default): `AdProvider`,
+  `AdAccount` (currency code; `CURRENCIES` in `domain/ad-budget.ts`), `AdPayment` (BDT) split into `AdCredit`s per account
+  with `rateToBdt` (the payment's dollar rate), dated `AdSpend` entries. `providerBalance()` → paid vs. credited BDT value:
+  provider owes us / we owe / settled (±1 BDT). Tabs Overview · Payments · Ad spend · Accounts; month filter.
+- **Roles & permissions**: every capability has a feature `group` (`CAPABILITY_GROUPS`); a new capability shows up on the
+  Roles page automatically, unticked. `PermissionRole` = named permission set; `User.permissionRoleId` + `extraPermissions`;
+  `User.permissions` always = `effectivePermissions(role, extras)` (recomputed when a role or person changes), so `can()`
+  is unchanged. New people / job-role changes start on the role named after the job role. Roles tab (grouped grid) and
+  People tab (job role, permission role, admin access, extras, restricted brands).
 
 ## Alerts: phone push + Telegram + 10:00 summary
 - **Web Push** (free, `web-push`): `public/sw.js` shows notifications; `src/app/manifest.ts` + `/public/icons`

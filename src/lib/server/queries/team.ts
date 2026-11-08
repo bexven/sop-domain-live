@@ -22,6 +22,8 @@ export async function getTeam() {
       adminAccess: true,
       isMaster: true,
       permissions: true,
+      permissionRoleId: true,
+      extraPermissions: true,
       brandAccess: true,
       mustChangePin: true,
       pinHash: true,
@@ -42,3 +44,10 @@ export async function getTeam() {
 }
 
 export type TeamRow = Awaited<ReturnType<typeof getTeam>>[number];
+
+/** Permission roles with how many people are on each (Roles & permissions page). */
+export async function getPermissionRoles() {
+  const roles = await db.permissionRole.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { users: { where: { removedAt: null } } } } } });
+  return roles.map((r) => ({ id: r.id, name: r.name, description: r.description, permissions: r.permissions, people: r._count.users }));
+}
+export type PermissionRoleDTO = Awaited<ReturnType<typeof getPermissionRoles>>[number];

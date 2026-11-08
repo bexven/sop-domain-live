@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Role } from "@/generated/prisma/enums";
 import { ROLES } from "./labels";
 import { navItemsFor } from "./nav";
-import { CAPABILITY_KEYS, can, canSeeProduct, defaultPermissions, normalizePermissions } from "./permissions";
+import { CAPABILITIES, CAPABILITY_GROUPS, CAPABILITY_KEYS, can, canSeeProduct, capabilitiesByGroup, defaultPermissions, effectivePermissions, normalizePermissions } from "./permissions";
 
 const as = (role: Role, permissions: string[] = defaultPermissions(role)) => ({ role, permissions });
 
@@ -84,5 +84,18 @@ describe("restricted brands", () => {
     expect(canSeeBrand({ isMaster: true, brandAccess: [] }, bexven)).toBe(true);
     expect(canSeeBrand({ isMaster: false, brandAccess: ["bx"] }, bexven)).toBe(true);
     expect(canSeeBrand({ isMaster: false, brandAccess: ["tt"] }, bexven)).toBe(false);
+  });
+});
+
+describe("permission roles", () => {
+  it("puts every permission in a known feature group", () => {
+    for (const k of CAPABILITY_KEYS) expect(CAPABILITY_GROUPS).toContain(CAPABILITIES[k].group);
+    expect(capabilitiesByGroup().flatMap((g) => g.keys).sort()).toEqual([...CAPABILITY_KEYS].sort());
+  });
+  it("combines a role's permissions with a person's extras, dropping unknown keys", () => {
+    expect(effectivePermissions(["orders.manage", "shipments.view"], ["shipments.view", "brief.edit", "old.thing"])).toEqual(
+      normalizePermissions(["orders.manage", "shipments.view", "brief.edit"]),
+    );
+    expect(effectivePermissions(null, ["brief.edit"])).toEqual(["brief.edit"]);
   });
 });

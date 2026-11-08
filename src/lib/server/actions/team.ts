@@ -13,8 +13,12 @@ import {
   accessSchema,
   removeMemberSchema,
   teamPinSchema,
+  permissionRoleSchema,
+  permissionRoleIdSchema,
 } from "@/lib/validation/team";
-import { defaultPermissions, normalizePermissions } from "@/lib/domain/permissions";
+import { defaultPermissions, effectivePermissions, normalizePermissions } from "@/lib/domain/permissions";
+import type { Role } from "@/generated/prisma/enums";
+import type { Tx } from "../db";
 import { ActionError, defineAction } from "../action";
 import { hashPin } from "../auth/pin-hash";
 import { db } from "../db";
@@ -36,6 +40,23 @@ async function teamSnapshot() {
   return db.user.findMany({ select: { id: true, role: true, active: true } });
 }
 
+/** The permission role named after a job role (e.g. "Supply Chain"), if the Master Admin kept it. */
+async function startingAccess(role: Role) {
+  const template = await db.permissionRole.findFirst({ where: { name: ROLE_LABELS[role] } });
+  return template
+    ? { permissionRoleId: template.id, extraPermissions: [] as string[], permissions: effectivePermissions(template.permissions, []) }
+    : { permissionRoleId: null, extraPermissions: defaultPermissions(role) as string[], permissions: defaultPermissions(role) };
+}
+
+/** Re-works everyone on a role after the role changed (their extras stay). */
+async function recomputeMembers(tx: Tx, roleId: string, rolePermissions: string[] | null) {
+  const members = await tx.user.findMany({ where: { permissionRoleId: roleId }, select: { id: true, extraPermissions: true } });
+  for (const m of members) {
+    await tx.user.update({ where: { id: m.id }, data: { permissions: effectivePermissions(rolePermissions, m.extraPermissions) } });
+  }
+  return members.length;
+}
+
 function done(message: string) {
   revalidatePath("/team");
   revalidatePath("/login");
@@ -54,7 +75,7 @@ export const createMemberAction = defineAction({
         role: input.role,
         avatarColor: input.avatarColor,
         adminAccess: input.role === "ADMIN" ? false : input.adminAccess,
-        permissions: defaultPermissions(input.role),
+        ...(await startingAccess(input.role)),
         pinHash: await hashPin(input.pin),
         mustChangePin: true,
       },
@@ -81,7 +102,7 @@ export const updateMemberAction = defineAction({
         avatarColor: input.avatarColor,
         adminAccess: input.role === "ADMIN" ? false : input.adminAccess,
         // A new job role starts from that role's default permissions (fine-tune on the Roles page).
-        ...(input.role !== target.role ? { permissions: defaultPermissions(input.role) } : {}),
+        ...(input.role !== target.role ? await startingAccess(input.role) : {}),
         // Permissions are read fresh from the DB on every request; bump only when access is reduced.
         ...(target.adminAccess && !input.adminAccess ? { sessionVersion: { increment: 1 } } : {}),
       },
@@ -159,7 +180,7 @@ export const unlockMemberAction = defineAction({
 export const setAccessAction = defineAction({
   masterOnly: true,
   schema: accessSchema,
-  run: async ({ id, role, adminAccess, permissions, brandAccess }, { user }) => {
+  run: async ({ id, role, adminAccess, permissionRoleId, extraPermissions, brandAccess }, { user }) => {
     const target = await db.user.findUnique({ where: { id } });
     if (!target) throw new ActionError("That person no longer exists.");
     if (target.isMaster) throw new ActionError("The Master Admin always has every permission.");
@@ -167,12 +188,16 @@ export const setAccessAction = defineAction({
       const guard = canChangeRole(user.id, target, role, await teamSnapshot());
       if (!guard.ok) throw new ActionError(guard.reason);
     }
+    const template = permissionRoleId ? await db.permissionRole.findUnique({ where: { id: permissionRoleId } }) : null;
+    if (permissionRoleId && !template) throw new ActionError("That role no longer exists.");
     await db.user.update({
       where: { id },
       data: {
         role,
         adminAccess: role === "ADMIN" ? false : adminAccess,
-        permissions: normalizePermissions(permissions),
+        permissionRoleId,
+        extraPermissions: normalizePermissions(extraPermissions),
+        permissions: effectivePermissions(template?.permissions ?? null, extraPermissions),
         brandAccess: (await db.brand.findMany({ where: { id: { in: brandAccess }, restricted: true }, select: { id: true } })).map((b) => b.id),
       },
     });
@@ -209,5 +234,44 @@ export const setTeamPinAction = defineAction({
       data: { pinHash: hash, mustChangePin: true, failedPinAttempts: 0, lockedUntil: null, sessionVersion: { increment: 1 } },
     });
     return done(`Temporary PIN set for ${r.count} people. Each will choose their own at next sign-in.`);
+  },
+});
+
+/** Roles tab: create or change a permission role; everyone on it gets the new set (plus their extras). */
+export const savePermissionRoleAction = defineAction({
+  masterOnly: true,
+  schema: permissionRoleSchema,
+  run: async ({ roleId, name, description, permissions }) => {
+    const clash = await db.permissionRole.findFirst({ where: { name: { equals: name, mode: "insensitive" }, ...(roleId ? { NOT: { id: roleId } } : {}) } });
+    if (clash) return { ok: false, error: "There's already a role with that name.", fieldErrors: { name: ["Name already used"] } };
+    const perms = normalizePermissions(permissions);
+    const count = await db.$transaction(async (tx) => {
+      if (roleId) {
+        if (!(await tx.permissionRole.findUnique({ where: { id: roleId } }))) throw new ActionError("That role no longer exists.");
+        await tx.permissionRole.update({ where: { id: roleId }, data: { name, description, permissions: perms } });
+        return recomputeMembers(tx, roleId, perms);
+      }
+      await tx.permissionRole.create({ data: { name, description, permissions: perms } });
+      return 0;
+    });
+    revalidatePath("/", "layout");
+    return done(roleId ? `${name} saved${count ? ` · ${count} ${count === 1 ? "person" : "people"} updated` : ""}` : `${name} role created`);
+  },
+});
+
+/** Deletes a role. Its people keep only their extra permissions until you give them another role. */
+export const deletePermissionRoleAction = defineAction({
+  masterOnly: true,
+  schema: permissionRoleIdSchema,
+  run: async ({ roleId }) => {
+    const role = await db.permissionRole.findUnique({ where: { id: roleId } });
+    if (!role) throw new ActionError("That role no longer exists.");
+    await db.$transaction(async (tx) => {
+      await recomputeMembers(tx, roleId, null);
+      await tx.user.updateMany({ where: { permissionRoleId: roleId }, data: { permissionRoleId: null } });
+      await tx.permissionRole.delete({ where: { id: roleId } });
+    });
+    revalidatePath("/", "layout");
+    return done(`${role.name} deleted`);
   },
 });

@@ -7,39 +7,55 @@ import type { Role } from "@/generated/prisma/enums";
  * every capability. The server enforces these in every action and page
  * loader; the UI only hides controls (cosmetic).
  */
+/**
+ * Feature groups, in the order the Roles page shows them. To add a feature: add its group here (if new) and its
+ * permissions to CAPABILITIES below. They appear on the Roles page automatically, unticked for every role.
+ */
+export const CAPABILITY_GROUPS = [
+  "Research & review",
+  "Products",
+  "Creative & tasks",
+  "Meta ads",
+  "Orders",
+  "Shipments",
+  "Ad budget",
+  "Admin",
+] as const;
+export type CapabilityGroup = (typeof CAPABILITY_GROUPS)[number];
+
 export const CAPABILITIES = {
-  "research.view": {
+  "research.view": { group: "Research & review",
     label: "See Research",
     hint: "Research page and products before they are approved",
     defaults: ["RESEARCHER", "MEDIA_BUYER", "REVIEWER"],
   },
-  "product.create": { label: "Add products", hint: "Add and research new products", defaults: ["RESEARCHER"] },
-  "product.addRunning": {
+  "product.create": { group: "Products", label: "Add products", hint: "Add and research new products", defaults: ["RESEARCHER"] },
+  "product.addRunning": { group: "Products",
     label: "Add running products",
     hint: "Add an existing product that's already selling (skips research and review)",
     defaults: ["MEDIA_BUYER"],
   },
-  "product.approve": { label: "Product review", hint: "Approve a product for testing or drop it", defaults: ["REVIEWER"] },
-  "task.review": {
+  "product.approve": { group: "Research & review", label: "Product review", hint: "Approve a product for testing or drop it", defaults: ["REVIEWER"] },
+  "task.review": { group: "Creative & tasks",
     label: "Senior: approve creative",
     hint: "Approve website images, Meta ad images and videos, or ask for changes",
     defaults: ["MEDIA_BUYER", "REVIEWER"],
   },
-  "brief.edit": { label: "Write creative brief", hint: "Write and update the brief designers follow", defaults: ["MEDIA_BUYER"] },
-  "campaign.manage": { label: "Meta ads", hint: "Launch campaigns and update their status", defaults: ["MEDIA_BUYER"] },
-  "batch.request": { label: "Request new creatives", hint: "Ask for a new creative batch while live", defaults: ["MEDIA_BUYER"] },
-  "orders.manage": { label: "Orders & scaling", hint: "Move products to ordering, add orders, set the scaling plan", defaults: ["MEDIA_BUYER", "SUPPLY_CHAIN"] },
-  "shipments.view": { label: "See shipments", hint: "Shipment Management: purchases on their way, costs and arrivals", defaults: ["SUPPLY_CHAIN", "MEDIA_BUYER"] },
-  "shipments.manage": { label: "Manage shipments", hint: "Add, edit and re-order shipments, mark paid / arrived, add vendors", defaults: ["SUPPLY_CHAIN", "MEDIA_BUYER"] },
-  "adbudget.view": { label: "See ad budget", hint: "Ad Budget: payments to the fund provider, account balances and ad spend", defaults: [] },
-  "adbudget.manage": { label: "Manage ad budget", hint: "Record payments, credits and ad spend; add ad accounts and providers", defaults: [] },
-  "product.sendBack": { label: "Send back", hint: "Send a product back to an earlier stage", defaults: ["MEDIA_BUYER", "REVIEWER"] },
-  "product.kill": { label: "Drop products", hint: "Stop working on a product", defaults: ["MEDIA_BUYER"] },
-  "product.override": { label: "Edit any product", hint: "Correct product details at any stage (logged)", defaults: [] },
-  "task.reassignAny": { label: "Reassign tasks", hint: "Hand anyone's task to someone else", defaults: [] },
-  "overview.view": { label: "Overview", hint: "Workload, bottlenecks and drop reasons", defaults: [] },
-  "settings.manage": { label: "Settings", hint: "Rates, SLAs, checklists and brands", defaults: [] },
-} as const satisfies Record<string, { label: string; hint: string; defaults: readonly Role[] }>;
+  "brief.edit": { group: "Creative & tasks", label: "Write creative brief", hint: "Write and update the brief designers follow", defaults: ["MEDIA_BUYER"] },
+  "campaign.manage": { group: "Meta ads", label: "Meta ads", hint: "Launch campaigns and update their status", defaults: ["MEDIA_BUYER"] },
+  "batch.request": { group: "Creative & tasks", label: "Request new creatives", hint: "Ask for a new creative batch while live", defaults: ["MEDIA_BUYER"] },
+  "orders.manage": { group: "Orders", label: "Orders & scaling", hint: "Move products to ordering, add orders, set the scaling plan", defaults: ["MEDIA_BUYER", "SUPPLY_CHAIN"] },
+  "shipments.view": { group: "Shipments", label: "See shipments", hint: "Shipment Management: purchases on their way, costs and arrivals", defaults: ["SUPPLY_CHAIN", "MEDIA_BUYER"] },
+  "shipments.manage": { group: "Shipments", label: "Manage shipments", hint: "Add, edit and re-order shipments, mark paid / arrived, add vendors", defaults: ["SUPPLY_CHAIN", "MEDIA_BUYER"] },
+  "adbudget.view": { group: "Ad budget", label: "See ad budget", hint: "Ad Budget: payments to the fund provider, account balances and ad spend", defaults: [] },
+  "adbudget.manage": { group: "Ad budget", label: "Manage ad budget", hint: "Record payments, credits and ad spend; add ad accounts and providers", defaults: [] },
+  "product.sendBack": { group: "Products", label: "Send back", hint: "Send a product back to an earlier stage", defaults: ["MEDIA_BUYER", "REVIEWER"] },
+  "product.kill": { group: "Products", label: "Drop products", hint: "Stop working on a product", defaults: ["MEDIA_BUYER"] },
+  "product.override": { group: "Products", label: "Edit any product", hint: "Correct product details at any stage (logged)", defaults: [] },
+  "task.reassignAny": { group: "Creative & tasks", label: "Reassign tasks", hint: "Hand anyone's task to someone else", defaults: [] },
+  "overview.view": { group: "Admin", label: "Overview", hint: "Workload, bottlenecks and drop reasons", defaults: [] },
+  "settings.manage": { group: "Admin", label: "Settings", hint: "Rates, SLAs, checklists and brands", defaults: [] },
+} as const satisfies Record<string, { group: CapabilityGroup; label: string; hint: string; defaults: readonly Role[] }>;
 
 export type Capability = keyof typeof CAPABILITIES;
 export const CAPABILITY_KEYS = Object.keys(CAPABILITIES) as Capability[];
@@ -89,4 +105,14 @@ export type BrandViewer = { isMaster: boolean; brandAccess: readonly string[] };
 export function canSeeBrand(viewer: BrandViewer, brand: { id: string; restricted: boolean } | null | undefined): boolean {
   if (!brand || !brand.restricted) return true;
   return viewer.isMaster || viewer.brandAccess.includes(brand.id);
+}
+
+/** Permissions grouped by feature, for the Roles page. */
+export function capabilitiesByGroup(): { group: CapabilityGroup; keys: Capability[] }[] {
+  return CAPABILITY_GROUPS.map((group) => ({ group, keys: CAPABILITY_KEYS.filter((k) => CAPABILITIES[k].group === group) })).filter((g) => g.keys.length > 0);
+}
+
+/** What a person can do: their role's permissions plus any extras ticked just for them. */
+export function effectivePermissions(rolePermissions: readonly string[] | null | undefined, extras: readonly string[]): Capability[] {
+  return normalizePermissions([...(rolePermissions ?? []), ...extras]);
 }
