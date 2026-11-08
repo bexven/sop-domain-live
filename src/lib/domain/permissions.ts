@@ -14,6 +14,11 @@ export const CAPABILITIES = {
     defaults: ["RESEARCHER", "MEDIA_BUYER", "REVIEWER"],
   },
   "product.create": { label: "Add products", hint: "Add and research new products", defaults: ["RESEARCHER"] },
+  "product.addRunning": {
+    label: "Add running products",
+    hint: "Add an existing product that's already selling (skips research and review)",
+    defaults: ["MEDIA_BUYER"],
+  },
   "product.approve": { label: "Product review", hint: "Approve a product for testing or drop it", defaults: ["REVIEWER"] },
   "task.review": {
     label: "Senior: approve creative",

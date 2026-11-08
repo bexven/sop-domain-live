@@ -8,7 +8,7 @@ import { NewProductDialog } from "@/components/product/new-product-dialog";
 import type { BrandDTO } from "@/lib/server/queries/product";
 
 /** "Add product" on the Research page. Opens automatically with ?add=1 (from the C shortcut or links). */
-export function AddProductButton({ brands, canResearch = true, canRunning = false, label = "Add product" }: { brands: BrandDTO[]; canResearch?: boolean; canRunning?: boolean; label?: string }) {
+export function AddProductButton({ brands, canResearch = true, canRunning = false, label = "Add Product" }: { brands: BrandDTO[]; canResearch?: boolean; canRunning?: boolean; label?: string }) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();

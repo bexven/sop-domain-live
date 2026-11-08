@@ -6,15 +6,14 @@ export type ResourceLane = "images" | "videos";
 type Person = Subject & { jobRole?: string | null };
 
 /**
- * Who adds products: anyone with "Add products", plus Admins and Media Buyers (owner's rule),
- * who can also add an already-running product straight to Live.
+ * Who adds products: "Add products" (research) or "Add running products" (straight to Live). Admins have both.
  */
 export function canAddProduct(user: Person): boolean {
   return can(user, "product.create") || canAddRunningProduct(user);
 }
 
 export function canAddRunningProduct(user: Person): boolean {
-  return user.role === "ADMIN" || user.jobRole === "MEDIA_BUYER" || user.role === "MEDIA_BUYER";
+  return can(user, "product.addRunning");
 }
 
 /** Extra links on a creative tab: that tab's makers, Seniors, Media Buyers and Admins. */

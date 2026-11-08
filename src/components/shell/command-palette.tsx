@@ -110,7 +110,7 @@ export function CommandPalette({ items, canCreate }: { items: NavItem[]; canCrea
                 {canCreate ? (
                   <Command.Group heading="Actions">
                     <PaletteItem value="add product research" onSelect={() => go("/research?add=1")}>
-                      <PlusIcon className="size-4 text-indigo-600" /> Add a product to research <Kbd>C</Kbd>
+                      <PlusIcon className="size-4 text-indigo-600" /> Add Product <Kbd>C</Kbd>
                     </PaletteItem>
                   </Command.Group>
                 ) : null}

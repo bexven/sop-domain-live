@@ -6,12 +6,13 @@ const person = (role: string, permissions: string[] = []) => ({ role: role as ne
 describe("adding products", () => {
   it("lets researchers, Media Buyers and Admins add products", () => {
     expect(canAddProduct(person("RESEARCHER", ["product.create"]))).toBe(true);
-    expect(canAddProduct(person("MEDIA_BUYER", ["campaign.manage"]))).toBe(true);
+    expect(canAddProduct(person("MEDIA_BUYER", ["product.addRunning"]))).toBe(true);
     expect(canAddProduct(person("ADMIN"))).toBe(true);
     expect(canAddProduct(person("VIDEO_EDITOR"))).toBe(false);
   });
-  it("only Admins and Media Buyers add already-running products", () => {
-    expect(canAddRunningProduct(person("MEDIA_BUYER"))).toBe(true);
+  it("only people with Add running products (and Admins) add running products", () => {
+    expect(canAddRunningProduct(person("MEDIA_BUYER", ["product.addRunning"]))).toBe(true);
+    expect(canAddRunningProduct(person("IMAGE_DESIGNER", ["product.create", "product.addRunning"]))).toBe(true);
     expect(canAddRunningProduct(person("ADMIN"))).toBe(true);
     expect(canAddRunningProduct(person("RESEARCHER", ["product.create"]))).toBe(false);
   });

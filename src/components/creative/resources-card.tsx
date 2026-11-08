@@ -79,6 +79,8 @@ export function ResourcesCard({ product, viewer, lane }: { product: ProductDetai
     ...product.referenceLinks.map((url) => ({ url, from: "Product" as const, lane: null })),
     ...product.imageResourceLinks.map((url) => ({ url, from: "Images" as const, lane: "images" as const })),
     ...product.videoResourceLinks.map((url) => ({ url, from: "Videos" as const, lane: "videos" as const })),
+    ...product.oldImageAssets.map((url) => ({ url, from: "Old images" as const, lane: null })),
+    ...product.oldVideoAssets.map((url) => ({ url, from: "Old videos" as const, lane: null })),
   ];
 
   return (

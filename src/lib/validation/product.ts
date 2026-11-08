@@ -91,18 +91,28 @@ export const rejectSchema = z.object({
   note: z.string().trim().min(3, "Say why it isn't approved").max(2000),
 });
 
-/** An old product that is already selling: straight to Live with a new creative batch. */
-export const createRunningProductSchema = z.object({
-  brandId: z.string().trim().min(1, "Choose the brand").max(64),
-  name: z.string().trim().min(2, "Name must be at least 2 characters").max(120, "Name is too long"),
-  imageUrl: optionalUrl,
-  supplierUrl: optionalUrl,
-  referenceLinks: z.array(urlSchema).max(20, "Up to 20 links").default([]),
-  priority: z.enum(Priority).default("MEDIUM"),
-  batchName: z.string().trim().min(2, "Give the creative batch a name").max(60, "Keep the name under 60 characters"),
-  types: z.array(z.enum(TaskType)).min(1, "Pick at least one image or video to make"),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a due date"),
-});
+/** An old product that is already selling: straight to Live, optionally with a new creative batch. */
+export const createRunningProductSchema = z
+  .object({
+    brandId: z.string().trim().min(1, "Choose the brand").max(64),
+    name: z.string().trim().min(2, "Name must be at least 2 characters").max(120, "Name is too long"),
+    websiteUrl: optionalUrl,
+    imageUrl: optionalUrl,
+    oldImageAssets: z.array(urlSchema).max(30, "Up to 30 links").default([]),
+    oldVideoAssets: z.array(urlSchema).max(30, "Up to 30 links").default([]),
+    referenceLinks: z.array(urlSchema).max(20, "Up to 20 links").default([]),
+    priority: z.enum(Priority).default("MEDIUM"),
+    withBatch: z.boolean().default(false),
+    batchName: z.string().trim().max(60, "Keep the name under 60 characters").optional().default(""),
+    types: z.array(z.enum(TaskType)).default([]),
+    dueDate: z.string().optional().default(""),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.withBatch) return;
+    if (v.batchName.length < 2) ctx.addIssue({ code: "custom", path: ["batchName"], message: "Give the creative batch a name" });
+    if (v.types.length === 0) ctx.addIssue({ code: "custom", path: ["types"], message: "Pick at least one image or video to make" });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v.dueDate)) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "Pick a due date" });
+  });
 
 export const resourceLinkSchema = z.object({
   productId: idSchema,

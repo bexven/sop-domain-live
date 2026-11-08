@@ -56,7 +56,7 @@ export function ResearchSummary({ product }: { product: ProductDetail }) {
             ) : (
               <span className="text-meta text-slate-500">No supplier link yet</span>
             )}
-            {[...product.referenceLinks, ...product.imageResourceLinks, ...product.videoResourceLinks].map((l, i) => (
+            {[...product.referenceLinks, ...product.imageResourceLinks, ...product.videoResourceLinks, ...product.oldImageAssets, ...product.oldVideoAssets].map((l, i) => (
               <Button key={l + i} asChild size="sm" variant="brandSoft">
                 <a href={l} target="_blank" rel="noopener noreferrer" className="max-w-[16rem]">
                   <LinkIcon /> <span className="truncate">{host(l)}</span>

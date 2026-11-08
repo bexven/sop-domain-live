@@ -30,6 +30,7 @@ import { db } from "../db";
 import { applyPlan } from "../services/apply-plan";
 import { autoAssign } from "../services/assign";
 import { logEvents, notify } from "../services/events";
+import { createRunningProduct } from "../services/running-product";
 import { adminShippingData, currentRates, researchData, settingsRateFor, shippingData } from "../services/product-helpers";
 import { loadSnapshot } from "../services/snapshot";
 
@@ -316,50 +317,33 @@ function endOfDhakaDay(day: string): Date {
  */
 export const createRunningProductAction = defineAction({
   schema: createRunningProductSchema,
-  run: async ({ brandId, name, imageUrl, supplierUrl, referenceLinks, priority, batchName, types, dueDate }, { user }) => {
-    if (!canAddRunningProduct(user)) throw new ActionError("Only Admins and Media Buyers can add a running product.");
+  run: async (input, { user }) => {
+    if (!canAddRunningProduct(user)) throw new ActionError("You don't have permission to add running products.");
+    const { brandId, name, websiteUrl, imageUrl, oldImageAssets, oldVideoAssets, referenceLinks, priority, withBatch, batchName, types, dueDate } = input;
     const now = new Date();
-    const dueAt = endOfDhakaDay(dueDate);
-    if (dueAt.getTime() <= now.getTime()) return { ok: false, error: "Pick a due date in the future.", fieldErrors: { dueDate: ["Pick a future date"] } };
+    const dueAt = withBatch ? endOfDhakaDay(dueDate) : null;
+    if (dueAt && dueAt.getTime() <= now.getTime()) return { ok: false, error: "Pick a due date in the future.", fieldErrors: { dueDate: ["Pick a future date"] } };
     const result = await db.$transaction(async (tx) => {
-      const brand = await tx.brand.findUnique({ where: { id: brandId } });
-      if (!brand?.active) throw new ActionError("Choose one of the brands.");
-      const { rates } = await currentRates(tx);
-      const mediaBuyerId =
-        user.jobRole === "MEDIA_BUYER" ? user.id : ((await autoAssign(tx, ["MEDIA_BUYER"], now, { brandId }))[0] ?? null);
-      const product = await tx.product.create({
-        data: {
-          brandId,
-          name,
-          imageUrl,
-          supplierUrl,
-          referenceLinks,
-          priority,
-          ...rates,
-          stage: "LIVE",
-          stageEnteredAt: now,
-          addedRunning: true,
-          mediaBuyerId,
-          createdById: user.id,
-        },
-      });
-      await tx.stageTransition.create({ data: { productId: product.id, fromStage: null, toStage: "LIVE", actorId: user.id, at: now } });
-      // Its ads are already running: record that as campaign #1 (name and details can be filled in later).
-      await tx.adCampaign.create({
-        data: { productId: product.id, number: 1, name: "Running campaign", status: "RUNNING", launchedAt: now, launchedById: user.id, createdById: user.id },
-      });
-      await logEvents(tx, [{ type: "PRODUCT_CREATED", actorId: user.id, productId: product.id, data: { running: true } }]);
-      const { product: full, snap } = await loadSnapshot(tx, product.id);
-      const planned = planNewBatch(snap, { types, dueAt, reason: null, name: batchName });
-      if (!planned.ok) throw new ActionError(planned.error);
-      const applied = await applyPlan(tx, planned.plan, { actorId: user.id, product: full, now });
-      await logEvents(tx, [
-        { type: "BATCH_REQUESTED", actorId: user.id, productId: product.id, data: { number: planned.plan.newBatch!.number, name: batchName, types, dueAt: dueAt.toISOString() } },
-      ]);
-      return { id: product.id, count: applied.createdTasks.length };
+      const id = await createRunningProduct(tx, user, { brandId, name, websiteUrl, imageUrl, oldImageAssets, oldVideoAssets, referenceLinks, priority }, now);
+      let count = 0;
+      if (withBatch && dueAt) {
+        const { product: full, snap } = await loadSnapshot(tx, id);
+        const planned = planNewBatch(snap, { types, dueAt, reason: null, name: batchName });
+        if (!planned.ok) throw new ActionError(planned.error);
+        const applied = await applyPlan(tx, planned.plan, { actorId: user.id, product: full, now });
+        await logEvents(tx, [
+          { type: "BATCH_REQUESTED", actorId: user.id, productId: id, data: { number: planned.plan.newBatch!.number, name: batchName, types, dueAt: dueAt.toISOString() } },
+        ]);
+        count = applied.createdTasks.length;
+      }
+      return { id, count };
     });
     revalidateProduct();
-    return { ok: true, message: `${name} added as running · ${result.count} creative task${result.count === 1 ? "" : "s"} assigned`, data: { id: result.id } };
+    return {
+      ok: true,
+      message: `${name} added as running${result.count ? ` · ${result.count} creative task${result.count === 1 ? "" : "s"} assigned` : ""}`,
+      data: { id: result.id },
+    };
   },
 });
 

@@ -54,7 +54,7 @@ export default async function ResearchPage({ searchParams }: PageProps<"/researc
         actions={
           canAdd ? (
             <Suspense>
-              <AddProductButton brands={brands.filter((b) => b.active)} canResearch={canAddProduct(user)} canRunning={canAddRunningProduct(user)} />
+              <AddProductButton brands={brands.filter((b) => b.active)} canResearch={can(user, "product.create")} canRunning={canAddRunningProduct(user)} />
             </Suspense>
           ) : null
         }
@@ -140,7 +140,7 @@ export default async function ResearchPage({ searchParams }: PageProps<"/researc
             <EmptyState
               icon={FlaskConicalIcon}
               title="No products in research"
-              description={canAdd ? "Click “Add product” to start a new one. You can save a draft and finish it later." : "Products appear here while the researcher is filling them in."}
+              description={canAdd ? "Click “Add Product” to start a new one. You can save a draft and finish it later." : "Products appear here while the researcher is filling them in."}
             />
           ) : null}
         </div>

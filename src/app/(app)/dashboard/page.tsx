@@ -57,7 +57,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   ]);
   const testOrders = canPlaceTestOrder(user) ? await getOpenTestOrders(user) : [];
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Dhaka" }).format(new Date());
-  const brands = canAddRunningProduct(user) ? await getBrands(user) : [];
+  const brands = canAddProduct(user) ? await getBrands(user) : [];
   const running = products.filter((p) => p.stage !== "COMPLETED" && p.stage !== "KILLED");
   const mine = q.today.length + q.upcoming.length + q.overdue.length + q.revision.length;
   const total = mine + q.review.length + q.unassigned.length + boardTasks.length + testOrders.length;
@@ -96,9 +96,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           </h1>
           <p className="mt-1 max-w-2xl text-body text-slate-600">{isAdmin ? HELP.ADMIN : HELP[user.jobRole]}</p>
         </div>
-        {canAddRunningProduct(user) ? (
+        {canAddProduct(user) ? (
           <Suspense>
-            <AddProductButton brands={brands.filter((b) => b.active)} canResearch={canAddProduct(user)} canRunning label="New product" />
+            <AddProductButton brands={brands.filter((b) => b.active)} canResearch={can(user, "product.create")} canRunning={canAddRunningProduct(user)} label="Add Product" />
           </Suspense>
         ) : null}
       </div>
@@ -144,7 +144,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           action={
             can(user, "product.create") ? (
               <Button asChild>
-                <Link href="/research?add=1">Add a product</Link>
+                <Link href="/research?add=1">Add Product</Link>
               </Button>
             ) : undefined
           }

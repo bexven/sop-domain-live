@@ -137,6 +137,8 @@ export async function getProductDetail(id: string, viewer: BrandViewer & { role?
     imageResourceLinks: p.imageResourceLinks,
     videoResourceLinks: p.videoResourceLinks,
     addedRunning: p.addedRunning,
+    oldImageAssets: p.oldImageAssets,
+    oldVideoAssets: p.oldVideoAssets,
     targetLaunchDate: p.targetLaunchDate ? p.targetLaunchDate.toISOString().slice(0, 10) : null,
     creativeBrief: p.creativeBrief,
     creativeBriefUpdatedAt: iso(p.creativeBriefUpdatedAt),
