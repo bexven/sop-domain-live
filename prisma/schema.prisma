@@ -863,6 +863,75 @@ model Shipment {
   @@index([arrived, estimatedDeliveryOn])
 }
 
+/// Ad Budget: the third-party fund provider we pay (in BDT) to load our ad accounts.
+model AdProvider {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  payments  AdPayment[]
+  accounts  AdAccount[]
+}
+
+/// An advertising account. Currency is a code ("BDT", "USD", …) so more can be added later.
+model AdAccount {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  currency   String
+  providerId String?
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  provider   AdProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  credits    AdCredit[]
+  spends     AdSpend[]
+}
+
+/// One payment to a provider (BDT), split into credits on one or more ad accounts.
+model AdPayment {
+  id          String     @id @default(cuid())
+  number      Int        @unique @default(autoincrement())
+  providerId  String
+  paidOn      DateTime   @db.Date
+  amountBdt   Decimal    @db.Decimal(14, 2)
+  reference   String?
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  provider    AdProvider @relation(fields: [providerId], references: [id])
+  credits     AdCredit[]
+
+  @@index([paidOn])
+}
+
+/// Funds credited to one ad account from a payment, in the account's currency. rateToBdt values it in BDT
+/// (1 for BDT accounts; the provider's dollar rate for USD accounts).
+model AdCredit {
+  id        String    @id @default(cuid())
+  paymentId String
+  accountId String
+  amount    Decimal   @db.Decimal(14, 2)
+  rateToBdt Decimal   @default(1) @db.Decimal(12, 4)
+  payment   AdPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  account   AdAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+}
+
+/// Ad spend on one account (in its currency), entered any time with a date.
+model AdSpend {
+  id          String    @id @default(cuid())
+  accountId   String
+  spentOn     DateTime  @db.Date
+  amount      Decimal   @db.Decimal(14, 2)
+  note        String?
+  createdById String
+  createdAt   DateTime  @default(now())
+  account     AdAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, spentOn])
+  @@index([spentOn])
+}
+
 /// A browser / phone that turned on push notifications for one person.
 model PushDevice {
   id         String    @id @default(cuid())

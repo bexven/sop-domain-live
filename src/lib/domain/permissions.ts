@@ -31,6 +31,8 @@ export const CAPABILITIES = {
   "orders.manage": { label: "Orders & scaling", hint: "Move products to ordering, add orders, set the scaling plan", defaults: ["MEDIA_BUYER", "SUPPLY_CHAIN"] },
   "shipments.view": { label: "See shipments", hint: "Shipment Management: purchases on their way, costs and arrivals", defaults: ["SUPPLY_CHAIN", "MEDIA_BUYER"] },
   "shipments.manage": { label: "Manage shipments", hint: "Add, edit and re-order shipments, mark paid / arrived, add vendors", defaults: ["SUPPLY_CHAIN", "MEDIA_BUYER"] },
+  "adbudget.view": { label: "See ad budget", hint: "Ad Budget: payments to the fund provider, account balances and ad spend", defaults: [] },
+  "adbudget.manage": { label: "Manage ad budget", hint: "Record payments, credits and ad spend; add ad accounts and providers", defaults: [] },
   "product.sendBack": { label: "Send back", hint: "Send a product back to an earlier stage", defaults: ["MEDIA_BUYER", "REVIEWER"] },
   "product.kill": { label: "Drop products", hint: "Stop working on a product", defaults: ["MEDIA_BUYER"] },
   "product.override": { label: "Edit any product", hint: "Correct product details at any stage (logged)", defaults: [] },
