@@ -252,6 +252,9 @@ src/generated/     Prisma client (generated, git-ignored)
 - Overview tiles in order: Ad fund cost this month · Provider balance (unpaid bills = what we owe) · Received BDT accounts ·
   Received USD accounts. **Ad spend tab is automatic**: the fund bills month by month (no manual entries; `AdSpend` table and
   its actions are kept unused). Month switcher uses ‹ › buttons (the native month input's icon was invisible).
+- A fund's bill shown everywhere = its credits' BDT values (USD × rate; older funds use `AdCredit.rateToBdt`) + fee, so every
+  month total includes USD; `costBreakdown()` shows the parts. **History tab** (`fundHistory()`): every fund received per
+  account, provider fee and payment to the provider (on its paid day), newest first, grouped by month.
 - **Shipments**: tiles On the way · Shipping unpaid · Shipping paid (BDT) · Active Shipments (= all shipments); tiles that
   match a filter are clickable; the page opens on **All**. `Shipment.shippingPaidOn` / `arrivedOn` (Dhaka days; `flagDay()`):
   set to today by the one-tap buttons, editable in the dialog. Desktop = table, below `lg` = cards.

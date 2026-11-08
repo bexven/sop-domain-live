@@ -7,7 +7,7 @@ import { getAdBudget } from "@/lib/server/queries/ad-budget";
 
 export const metadata: Metadata = { title: "Ad budget" };
 
-const TABS = ["overview", "spend", "accounts"] as const;
+const TABS = ["overview", "spend", "history", "accounts"] as const;
 
 export default async function AdBudgetPage({ searchParams }: PageProps<"/ad-budget">) {
   const user = await requireCapability("adbudget.view");

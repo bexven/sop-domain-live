@@ -15,7 +15,7 @@ import type { AdBudget } from "@/lib/server/queries/ad-budget";
 import { cn } from "@/lib/utils";
 import { FundDialog } from "./fund-dialog";
 
-export type Tab = "overview" | "spend" | "accounts";
+export type Tab = "overview" | "spend" | "history" | "accounts";
 
 export function money(amount: string | number, currency: string): string {
   if (currency === "BDT") return formatBdt(amount);
@@ -36,6 +36,7 @@ export function AdBudgetView({ data, tab, canManage }: { data: AdBudget; tab: Ta
             [
               ["overview", "Overview"],
               ["spend", "Ad spend"],
+              ["history", "History"],
               ["accounts", "Accounts"],
             ] as const
           ).map(([k, label]) => (
@@ -57,6 +58,7 @@ export function AdBudgetView({ data, tab, canManage }: { data: AdBudget; tab: Ta
       </div>
       {tab === "overview" ? <Overview data={data} canManage={canManage} /> : null}
       {tab === "spend" ? <Spend data={data} /> : null}
+      {tab === "history" ? <History data={data} /> : null}
       {tab === "accounts" ? <Accounts data={data} canManage={canManage} /> : null}
     </div>
   );
@@ -96,7 +98,7 @@ function Overview({ data, canManage }: { data: AdBudget; canManage: boolean }) {
   return (
     <>
       <section aria-label="This month" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile icon={ReceiptIcon} tone="text-indigo-600" label="Ad fund cost this month" value={formatBdt(o.monthCostBdt)} sub={Number(o.monthFeeBdt) ? `incl. ${formatBdt(o.monthFeeBdt)} fee` : monthLabel(data.month)} />
+        <Tile icon={ReceiptIcon} tone="text-indigo-600" label="Ad fund cost this month" value={formatBdt(o.monthCost.totalBdt)} sub={<CostParts cost={o.monthCost} />} />
         <Tile
           icon={ScaleIcon}
           tone={o.settled ? "text-emerald-600" : "text-rose-600"}
@@ -222,6 +224,143 @@ function FundRow({ f, provider, canManage, onEdit }: { f: AdBudget["funds"][numb
   );
 }
 
+type Cost = AdBudget["overview"]["monthCost"];
+
+/** "BDT ৳10,000 + USD $500 = ৳62,000 + fee ৳500": how the BDT total is made up. */
+function CostParts({ cost }: { cost: Cost }) {
+  const parts: React.ReactNode[] = [];
+  if (Number(cost.bdtBdt)) parts.push(<span key="bdt">BDT accounts <span className="num">{formatBdt(cost.bdtBdt)}</span></span>);
+  for (const [cur, amt] of Object.entries(cost.foreignByCurrency)) {
+    parts.push(
+      <span key={cur}>
+        {cur} <span className="num">{money(amt, cur)}</span> = <span className="num">{formatBdt(cost.foreignBdtByCurrency[cur] ?? "0")}</span>
+      </span>,
+    );
+  }
+  if (Number(cost.feeBdt)) parts.push(<span key="fee">fee <span className="num">{formatBdt(cost.feeBdt)}</span></span>);
+  if (parts.length === 0) return <>Nothing recorded yet</>;
+  return (
+    <>
+      {parts.map((p, i) => (
+        <span key={i}>
+          {i ? " + " : ""}
+          {p}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function HistoryPill({ kind }: { kind: AdBudget["history"][number]["kind"] }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-meta whitespace-nowrap ring-1 ring-inset",
+        kind === "paid" ? "bg-emerald-50 text-emerald-800 ring-emerald-200" : kind === "fee" ? "bg-amber-50 text-amber-800 ring-amber-200" : "bg-sky-50 text-sky-800 ring-sky-200",
+      )}
+    >
+      {kind === "paid" ? "Paid to provider" : kind === "fee" ? "Provider fee" : "Fund received"}
+    </span>
+  );
+}
+
+/** Every transaction (account credits, provider fees, payments to the provider), newest first, by month. */
+function History({ data }: { data: AdBudget }) {
+  if (data.history.length === 0) {
+    return <p className="surface rounded-panel px-4 py-8 text-center text-body text-slate-600">Every fund loaded into an ad account and every payment to the provider will be listed here. Record an ad fund on the Overview to start.</p>;
+  }
+  const months = [...new Set(data.history.map((e) => e.date.slice(0, 7)))];
+  return (
+    <div className="grid gap-5">
+      {months.map((m) => {
+        const rows = data.history.filter((e) => e.date.slice(0, 7) === m);
+        const loaded = rows.filter((e) => e.kind !== "paid").reduce((s, e) => s + Number(e.bdt), 0);
+        const paid = rows.filter((e) => e.kind === "paid").reduce((s, e) => s + Number(e.bdt), 0);
+        return (
+          <section key={m} aria-labelledby={`h-${m}`} className="grid gap-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id={`h-${m}`} className="text-section text-slate-900">
+                {monthLabel(m)}
+              </h2>
+              <p className="text-meta font-normal text-slate-600">
+                Funds + fees <span className="num font-semibold text-slate-900">{formatBdt(loaded)}</span> · Paid to provider{" "}
+                <span className="num font-semibold text-emerald-800">{formatBdt(paid)}</span>
+              </p>
+            </div>
+            <ul className="surface divide-y divide-slate-900/[0.06] rounded-panel md:hidden">
+              {rows.map((e) => (
+                <li key={e.key} className="grid gap-1 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <HistoryPill kind={e.kind} />
+                    <span className={cn("num text-body font-semibold", e.kind === "paid" ? "text-emerald-800" : "text-slate-900")}>
+                      {e.kind === "paid" ? "− " : ""}
+                      {formatBdt(e.bdt)}
+                    </span>
+                  </div>
+                  <p className="text-body text-slate-800">{e.kind === "credit" ? e.accountName : e.kind === "paid" ? e.accountNames.join(", ") : "Provider fee"}</p>
+                  <p className="text-meta font-normal text-slate-600">
+                    <span className="num">{d(e.date)}</span> · {e.provider} · <span className="num">#{e.fundNumber}</span>
+                    {e.kind === "credit" && e.currency !== "BDT" ? (
+                      <span className="num">
+                        {" "}
+                        · {money(e.amount, e.currency)}
+                        {e.rate ? ` × ${Number(e.rate)}` : ""}
+                      </span>
+                    ) : null}
+                    {e.kind === "paid" && e.reference ? <span className="num"> · Ref {e.reference}</span> : null}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="surface relative hidden overflow-x-auto rounded-panel md:block">
+              <table className="w-full min-w-[640px] text-left text-body">
+                <thead className="border-b border-slate-900/[0.06] bg-slate-50/70 text-meta text-slate-600">
+                  <tr>
+                    <th scope="col" className="px-4 py-2 font-medium">Date</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Transaction</th>
+                    <th scope="col" className="px-3 py-2 font-medium">Ad account</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+                    <th scope="col" className="px-4 py-2 text-right font-medium">BDT</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-900/[0.06]">
+                  {rows.map((e) => (
+                    <tr key={e.key}>
+                      <td className="num px-4 py-2.5 whitespace-nowrap text-slate-700">{d(e.date)}</td>
+                      <td className="px-3 py-2.5">
+                        <HistoryPill kind={e.kind} />
+                        <span className="ml-2 text-meta font-normal text-slate-600">
+                          {e.provider} · <span className="num">#{e.fundNumber}</span>
+                          {e.kind === "paid" && e.reference ? <span className="num"> · Ref {e.reference}</span> : null}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-slate-800">{e.kind === "credit" ? e.accountName : e.kind === "paid" ? e.accountNames.join(", ") : "—"}</td>
+                      <td className="num px-3 py-2.5 text-right whitespace-nowrap text-slate-700">
+                        {e.kind === "credit" ? (
+                          <>
+                            {money(e.amount, e.currency)}
+                            {e.rate ? <span className="text-slate-500"> × {Number(e.rate)}</span> : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className={cn("num px-4 py-2.5 text-right font-semibold whitespace-nowrap", e.kind === "paid" ? "text-emerald-800" : "text-slate-900")}>
+                        {e.kind === "paid" ? "− " : ""}
+                        {formatBdt(e.bdt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Ad spend = what the ad funds cost, month by month (automatic from Record Ad Fund). */
 function Spend({ data }: { data: AdBudget }) {
   if (data.monthly.length === 0) {
@@ -235,6 +374,9 @@ function Spend({ data }: { data: AdBudget }) {
             <h2 className="text-section text-slate-900">{monthLabel(m.month)}</h2>
             <span className="num text-[20px] font-semibold text-slate-900">{formatBdt(m.totalBdt)}</span>
           </div>
+          <p className="text-meta font-normal text-slate-600">
+            <CostParts cost={m.cost} />
+          </p>
           <div className="flex flex-wrap gap-2 text-meta">
             <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800 ring-1 ring-emerald-200 ring-inset">
               Paid <span className="num">{formatBdt(m.paidBdt)}</span>

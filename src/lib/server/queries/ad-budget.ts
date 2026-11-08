@@ -1,6 +1,6 @@
 import "server-only";
 import Decimal from "decimal.js";
-import { creditBdt, monthOf, providerBalance, sumBy } from "@/lib/domain/ad-budget";
+import { costBreakdown, creditBdt, fundHistory, monthOf, providerBalance, sumBy } from "@/lib/domain/ad-budget";
 import { db } from "../db";
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -16,6 +16,7 @@ export async function getAdBudget(month: string) {
   const funds = rows.map((f) => {
     const usdRate = f.usdRate?.toString() ?? null;
     const credits = f.credits.map((c) => ({
+      rate: c.account.currency === "BDT" ? null : (usdRate ?? c.rateToBdt.toString()),
       id: c.id,
       accountId: c.accountId,
       accountName: c.account.name,
@@ -24,12 +25,14 @@ export async function getAdBudget(month: string) {
       // Funds recorded before the bill existed have no fund-level rate: use the credit's own rate.
       billBdt: creditBdt({ amount: c.amount.toString(), currency: c.account.currency }, usdRate ?? c.rateToBdt.toString()).toFixed(2),
     }));
+    // The bill is always the sum of its parts, so USD × rate is counted in every total.
+    const billBdt = credits.reduce((sum, c) => sum.plus(c.billBdt), new Decimal(f.feeBdt.toString())).toFixed(2);
     return {
       id: f.id,
       number: f.number,
       providerId: f.providerId,
       receivedOn: day(f.paidOn),
-      billBdt: f.amountBdt.toString(),
+      billBdt,
       feeBdt: f.feeBdt.toString(),
       usdRate,
       paid: f.paid,
@@ -61,7 +64,9 @@ export async function getAdBudget(month: string) {
       monthBillBdt: sumBy(monthCredits.filter((c) => c.accountId === a.id), () => "x", (c) => c.billBdt).x ?? "0.00",
     })),
     funds,
+    history: fundHistory(funds.map((f) => ({ ...f, provider: providers.find((p) => p.id === f.providerId)?.name ?? "—" }))),
     overview: {
+      monthCost: costBreakdown(inMonth),
       monthCostBdt: sumBy(inMonth, () => "x", (f) => f.billBdt).x ?? "0.00",
       monthReceivedByCurrency: sumBy(monthCredits, (c) => c.currency, (c) => c.amount),
       monthFeeBdt: sumBy(inMonth, () => "x", (f) => f.feeBdt).x ?? "0.00",
@@ -75,6 +80,7 @@ export async function getAdBudget(month: string) {
       return {
         month: m,
         totalBdt: sumBy(fs, () => "x", (f) => f.billBdt).x ?? "0.00",
+        cost: costBreakdown(fs),
         paidBdt: sumBy(fs.filter((f) => f.paid), () => "x", (f) => f.billBdt).x ?? "0.00",
         unpaidBdt: sumBy(fs.filter((f) => !f.paid), () => "x", (f) => f.billBdt).x ?? "0.00",
         feeBdt: sumBy(fs, () => "x", (f) => f.feeBdt).x ?? "0.00",

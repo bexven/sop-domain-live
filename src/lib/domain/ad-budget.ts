@@ -64,3 +64,70 @@ export function sumBy<T>(rows: T[], key: (r: T) => string, amount: (r: T) => str
   }
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, v.toFixed(2)]));
 }
+
+type CostCredit = { currency: string; amount: string; billBdt: string };
+
+/** What a set of funds cost in BDT, split into BDT loaded, other currencies (at their rates) and fees. */
+export function costBreakdown(funds: { feeBdt: string; credits: CostCredit[] }[]) {
+  let bdt = new Decimal(0);
+  let foreignBdt = new Decimal(0);
+  let fee = new Decimal(0);
+  const foreign: Record<string, Decimal> = {};
+  const foreignValue: Record<string, Decimal> = {};
+  for (const f of funds) {
+    fee = fee.plus(f.feeBdt || 0);
+    for (const c of f.credits) {
+      if (c.currency === "BDT") bdt = bdt.plus(c.amount);
+      else {
+        foreignBdt = foreignBdt.plus(c.billBdt);
+        foreign[c.currency] = (foreign[c.currency] ?? new Decimal(0)).plus(c.amount);
+        foreignValue[c.currency] = (foreignValue[c.currency] ?? new Decimal(0)).plus(c.billBdt);
+      }
+    }
+  }
+  return {
+    bdtBdt: bdt.toFixed(2),
+    foreignBdt: foreignBdt.toFixed(2),
+    foreignByCurrency: Object.fromEntries(Object.entries(foreign).map(([k, v]) => [k, v.toFixed(2)])),
+    foreignBdtByCurrency: Object.fromEntries(Object.entries(foreignValue).map(([k, v]) => [k, v.toFixed(2)])),
+    feeBdt: fee.toFixed(2),
+    totalBdt: bdt.plus(foreignBdt).plus(fee).toFixed(2),
+  };
+}
+
+export type HistoryEntry =
+  | { kind: "credit"; key: string; date: string; fundNumber: number; provider: string; accountName: string; currency: string; amount: string; bdt: string; rate: string | null }
+  | { kind: "fee"; key: string; date: string; fundNumber: number; provider: string; bdt: string }
+  | { kind: "paid"; key: string; date: string; fundNumber: number; provider: string; accountNames: string[]; bdt: string; reference: string | null };
+
+type HistoryFund = {
+  id: string;
+  number: number;
+  provider: string;
+  receivedOn: string;
+  feeBdt: string;
+  paid: boolean;
+  paidOn: string | null;
+  billBdt: string;
+  reference: string | null;
+  credits: (CostCredit & { id: string; accountName: string; rate: string | null })[];
+};
+
+/**
+ * Every money movement, newest first: each account credit on the fund's receive day, the provider's fee,
+ * and the payment to the provider on its paid day (the receive day if no paid day was kept).
+ */
+export function fundHistory(funds: HistoryFund[]): HistoryEntry[] {
+  const out: HistoryEntry[] = [];
+  for (const f of funds) {
+    for (const c of f.credits) {
+      out.push({ kind: "credit", key: `c-${c.id}`, date: f.receivedOn, fundNumber: f.number, provider: f.provider, accountName: c.accountName, currency: c.currency, amount: c.amount, bdt: c.billBdt, rate: c.currency === "BDT" ? null : c.rate });
+    }
+    if (Number(f.feeBdt)) out.push({ kind: "fee", key: `f-${f.id}`, date: f.receivedOn, fundNumber: f.number, provider: f.provider, bdt: new Decimal(f.feeBdt).toFixed(2) });
+    if (f.paid) {
+      out.push({ kind: "paid", key: `p-${f.id}`, date: f.paidOn ?? f.receivedOn, fundNumber: f.number, provider: f.provider, accountNames: [...new Set(f.credits.map((c) => c.accountName))], bdt: f.billBdt, reference: f.reference });
+    }
+  }
+  const order = { paid: 0, fee: 1, credit: 2 } as const;
+  return out.sort((a, b) => b.date.localeCompare(a.date) || b.fundNumber - a.fundNumber || order[a.kind] - order[b.kind]);
+}
